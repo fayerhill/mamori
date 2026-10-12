@@ -99,16 +99,16 @@ final class GuardEngine: @unchecked Sendable {
         try store.save(value)
     }
     private func pfState() throws -> (enabled: Bool, count: Int) {
-        let info = try commands.pf(["-s", "info"])
+        let info = try commands.pfRead(["-s", "info"])
         guard let enabled = info.range(of: #"Status:\s+(Enabled|Disabled)"#, options: .regularExpression) else { throw GuardFailure.message("PF status could not be read.") }
-        let states = try commands.pf(["-s", "states"])
+        let states = try commands.pfRead(["-s", "states"])
         return (info[enabled].contains("Enabled"), states.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0 : 1)
     }
     private func verifyNoSkipInterfaces() throws {
-        let interfaces = try commands.pf(["-v", "-s", "Interfaces"])
+        let interfaces = try commands.pfRead(["-v", "-s", "Interfaces"])
         guard !interfaces.lowercased().contains("skip") else { throw GuardFailure.message("PF has interface skip settings. Mamori cannot establish complete packet filtering.") }
     }
-    private func ownRules() throws -> String { try commands.pf(["-a", GuardIdentity.anchor, "-s", "rules"]) }
+    private func ownRules() throws -> String { try commands.pfRead(["-a", GuardIdentity.anchor, "-s", "rules"]) }
     private func enableReferences() throws -> Set<String> {
         let result = try commands.run("/sbin/pfctl", ["-s", "References"])
         guard result.code == 0 else { throw GuardFailure.message("PF enable references could not be read. The saved reference is retained for retry.") }
@@ -117,13 +117,14 @@ final class GuardEngine: @unchecked Sendable {
     }
     private func compiledPolicy(_ configuration: GuardConfiguration, tunnelAllowed: Bool) throws -> (source: String, compiled: String) {
         let source = try GuardPolicy.render(configuration, tunnelAllowed: tunnelAllowed)
-        let compiled = try commands.pf(["-a", GuardIdentity.anchor, "-o", "none", "-n", "-v", "-f", "-"], input: source)
+        let compiled = try commands.pfCompilePolicy(source)
         guard GuardPolicy.validCompiledPolicy(compiled, tunnelAllowed: tunnelAllowed) else { throw GuardFailure.message("The PF parser returned an unsupported policy representation. No protection was activated.") }
         return (source, compiled)
     }
     private func verifyGlobalRules(root: String, owned: String) throws {
-        guard GuardPolicy.meaningfulLines(try commands.pf(["-s", "rules"])) == GuardPolicy.meaningfulLines(root),
-              try GuardPolicy.containsOnlyOwnedFilterRules(commands.pf(["-a", "*", "-s", "rules"]), expectedOwnRules: owned) else {
+        let snapshot = try PFRuleInspector(commands: commands).read()
+        guard GuardPolicy.meaningfulLines(snapshot.rootRules) == GuardPolicy.meaningfulLines(root),
+              GuardPolicy.containsOnlyOwnedFilterRules(snapshot.anchorRules, expectedOwnRules: owned) else {
             throw GuardFailure.message("Another firewall policy changed. Mamori will not overwrite or disable it.")
         }
     }
@@ -138,8 +139,9 @@ final class GuardEngine: @unchecked Sendable {
             guard vpn.state(for: config, requireEndpoints: true) == .connected else { throw GuardFailure.message("The selected tunnel and gateway could not be verified as the active GlobalProtect connection. Connect GlobalProtect first and detect its configuration.") }
             let pf = try pfState()
             try verifyNoSkipInterfaces()
-            let root = try commands.pf(["-s", "rules"])
-            try GuardPolicy.preflight(rootRules: root, recursiveRules: commands.pf(["-a", "*", "-s", "rules"]), pfEnabled: pf.enabled, stateCount: pf.count)
+            let snapshot = try PFRuleInspector(commands: commands).read()
+            let root = snapshot.rootRules
+            try GuardPolicy.preflight(rootRules: root, anchorRules: snapshot.anchorRules, pfEnabled: pf.enabled, stateCount: pf.count)
             guard try ownRules().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw GuardFailure.message("Mamori's anchor is already occupied. Restore the previous session first.") }
             let policy = try compiledPolicy(config, tunnelAllowed: true)
             var record = GuardJournal(configuration: config, ownerUID: uid, expectedRules: policy.compiled, rootRules: root, bootIdentifier: try bootIdentifier())

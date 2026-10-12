@@ -30,6 +30,7 @@ private final class FakePF: GuardCommandRunning, @unchecked Sendable {
     var rules = ""
     var states = ""
     var mutations: [[String]] = []
+    var requests: [[String]] = []
     var loadedPolicies: [String] = []
     var corruptLoad = false
     var failFlush = false
@@ -38,8 +39,20 @@ private final class FakePF: GuardCommandRunning, @unchecked Sendable {
     var referencesOutput: String?
     var failReferenceReadAfterRelease = false
     var retainReleasedReference = false
+    var anchorListings = ["": ["com.apple"], "com.apple": ["com.apple/200.AirDrop", "com.apple/250.ApplicationFirewall"]]
+    var anchorContents = ["com.apple": "anchor \"200.AirDrop/*\" all\nanchor \"250.ApplicationFirewall/*\" all\n"]
+    var readDiagnosticArguments: [String]?
+    var readDiagnostic = "pfctl: DIOCGETRULES: Invalid argument\n"
+    var changeTopologyAfterFirstRead = false
+    var compileExitCode: Int32 = 0
+    var compileDiagnostics = "pfctl: Use of -f option, could result in flushing of rules\npresent in the main ruleset added by the system at startup.\nSee /etc/pf.conf for further details.\n\n"
+    private var rootListReads = 0
     func run(_ executable: String, _ arguments: [String], input: String?) throws -> CommandResult {
         guard executable == "/sbin/pfctl" else { throw GuardFailure.message("Unexpected executable in inert test") }
+        requests.append(arguments)
+        if arguments == readDiagnosticArguments {
+            return CommandResult(code: 0, output: "anchor \"*\" all {\n}\n", error: readDiagnostic)
+        }
         var output = ""
         if arguments == ["-s", "info"] { output = "Status: \(enabled ? "Enabled" : "Disabled")\n" }
         else if arguments == ["-s", "References"] {
@@ -51,9 +64,23 @@ private final class FakePF: GuardCommandRunning, @unchecked Sendable {
         else if arguments == ["-s", "states"] { output = states }
         else if arguments == ["-v", "-s", "Interfaces"] { output = "lo0\nutun9\nen0\n" }
         else if arguments == ["-s", "rules"] { output = root }
-        else if arguments == ["-a", "*", "-s", "rules"] { output = root.trimmingCharacters(in: .whitespacesAndNewlines) + " {\n" + rules + "}\n" }
+        else if arguments == ["-a", "*", "-s", "rules"] {
+            // Actual host failure: partial recursive output despite a zero exit code.
+            return CommandResult(code: 0, output: "scrub-anchor \"com.apple/*\" all fragment reassemble\nanchor \"*\" all {\n}\n", error: "No ALTQ support in kernel\nALTQ related functions disabled\npfctl: DIOCGETRULES: Invalid argument\n")
+        }
         else if arguments == ["-a", GuardIdentity.anchor, "-s", "rules"] { output = rules }
-        else if arguments.contains("-n") { output = input ?? "" }
+        else if arguments.last == "Anchors" {
+            let path = arguments.first == "-a" ? arguments[1] : ""
+            var children = anchorListings[path] ?? []
+            if path == "com.apple", !rules.isEmpty, !children.contains(GuardIdentity.anchor) { children.insert(GuardIdentity.anchor, at: 0) }
+            if path.isEmpty {
+                rootListReads += 1
+                if changeTopologyAfterFirstRead && rootListReads > 1 { children.append("new-anchor") }
+            }
+            output = children.map { "  \($0)\n" }.joined()
+        }
+        else if arguments.count == 4, arguments[0] == "-a", arguments.suffix(2) == ["-s", "rules"] { output = anchorContents[arguments[1]] ?? "" }
+        else if arguments.contains("-n") { return CommandResult(code: compileExitCode, output: input ?? "", error: compileDiagnostics) }
         else if arguments.contains("-f") {
             mutations.append(arguments)
             rules = (input ?? "") + (corruptLoad ? "pass quick all\n" : "")
@@ -70,7 +97,7 @@ private final class FakePF: GuardCommandRunning, @unchecked Sendable {
             if !retainReleasedReference { references.remove("123") }
             enabled = !references.isEmpty
         } else { throw GuardFailure.message("Unexpected PF arguments in inert test: \(arguments)") }
-        return CommandResult(code: 0, output: output, error: "")
+        return CommandResult(code: 0, output: output, error: arguments.contains("-s") ? "No ALTQ support in kernel\nALTQ related functions disabled\n" : "")
     }
 }
 
@@ -124,6 +151,34 @@ final class GuardEngineTests: XCTestCase, @unchecked Sendable {
             XCTAssertNil(store.value, "A journal was created before confirming the VPN")
             XCTAssertFalse(store.removed)
         }
+    }
+    func testCompetingNestedFilterRulesRefuseBeforeAnyMutation() async throws {
+        let pf = FakePF(), store = MemoryJournal()
+        pf.anchorListings["com.apple/200.AirDrop"] = ["com.apple/200.AirDrop/nested"]
+        pf.anchorContents["com.apple/200.AirDrop/nested"] = "pass quick all\n"
+        let result = try await request(engine(pf, store), "start")
+        XCTAssertEqual(result.phase, .fault)
+        XCTAssertTrue(pf.mutations.isEmpty)
+        XCTAssertNil(store.value)
+    }
+    func testUnexpectedCompilerDiagnosticRefusesBeforeAnyMutation() async throws {
+        let pf = FakePF(), store = MemoryJournal()
+        pf.compileDiagnostics += "pfctl: syntax error\n"
+        let result = try await request(engine(pf, store), "start")
+        XCTAssertEqual(result.phase, .fault)
+        XCTAssertTrue(pf.mutations.isEmpty)
+        XCTAssertNil(store.value)
+    }
+    func testNewSiblingFilterRulesPreventRestoreWithoutRemovingOwnedRules() async throws {
+        let pf = FakePF(), store = MemoryJournal(), guardEngine = engine(pf, store)
+        let active = try await request(guardEngine, "start")
+        XCTAssertEqual(active.phase, .protected, active.message)
+        pf.anchorContents["com.apple/250.ApplicationFirewall"] = "pass quick all\n"
+        let result = try await request(guardEngine, "stop")
+        XCTAssertEqual(result.phase, .fault)
+        XCTAssertTrue(pf.rules.contains("mamori-default-deny"))
+        XCTAssertFalse(pf.mutations.contains { $0.contains("-F") || $0.contains("-X") })
+        XCTAssertNotNil(store.value)
     }
     func testUnexpectedLoadedRuleNeverEnablesPF() async throws {
         let pf = FakePF(), store = MemoryJournal()
@@ -293,6 +348,89 @@ final class GuardEngineTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(store.value?.expectedRules, narrowed)
         XCTAssertNil(store.value?.pendingRules)
         XCTAssertTrue(pf.mutations.isEmpty)
+    }
+}
+
+final class PFRuleInspectorTests: XCTestCase {
+    func testActualHostHierarchyAvoidsBrokenWildcardPrinter() throws {
+        let pf = FakePF()
+        pf.root = "scrub-anchor \"com.apple/*\" all fragment reassemble\nanchor \"com.apple/*\" all\n"
+        pf.rules = try GuardPolicy.render(.init(tunnelInterface: "utun9", gatewayAddresses: ["203.0.113.4"]), tunnelAllowed: true)
+        let snapshot = try PFRuleInspector(commands: pf).read()
+        XCTAssertEqual(snapshot.rootRules, pf.root)
+        XCTAssertEqual(snapshot.anchorRules[GuardIdentity.anchor], pf.rules)
+        XCTAssertEqual(Set(snapshot.anchorRules.keys), ["com.apple", "com.apple/000.mamori", "com.apple/200.AirDrop", "com.apple/250.ApplicationFirewall"])
+        XCTAssertTrue(GuardPolicy.containsOnlyOwnedFilterRules(snapshot.anchorRules, expectedOwnRules: pf.rules))
+        XCTAssertFalse(pf.requests.contains { $0.contains("*") })
+        XCTAssertTrue(pf.mutations.isEmpty)
+    }
+    func testExitZeroDiagnosticsNeverCountAsSuccessfulInspection() throws {
+        for args in [["-s", "rules"], ["-s", "Anchors"], ["-a", "com.apple/200.AirDrop", "-s", "rules"]] {
+            let pf = FakePF()
+            pf.readDiagnosticArguments = args
+            XCTAssertThrowsError(try PFRuleInspector(commands: pf).read(), args.joined(separator: " "))
+            XCTAssertTrue(pf.mutations.isEmpty)
+        }
+        let pf = FakePF()
+        // The prior recursive operation's success status must not hide its stderr error.
+        XCTAssertThrowsError(try pf.pfRead(["-a", "*", "-s", "rules"]))
+    }
+    func testUnexpectedTraversalAndDuplicatePathsAreRejected() {
+        for listing in [["com.apple"], ["000.mamori"], ["com.apple/*"], ["com.apple/../other"],
+                        ["com.apple/child/grandchild"], ["elsewhere/child"],
+                        ["com.apple/child", "com.apple/child"]] {
+            let pf = FakePF()
+            pf.anchorListings["com.apple"] = listing
+            XCTAssertThrowsError(try PFRuleInspector(commands: pf).read(), listing.joined(separator: ", "))
+            XCTAssertTrue(pf.mutations.isEmpty)
+        }
+    }
+    func testTraversalLimitsAndTopologyChangesAreRejected() {
+        let wide = FakePF()
+        wide.anchorListings["com.apple"] = (0...64).map { "com.apple/child\($0)" }
+        XCTAssertThrowsError(try PFRuleInspector(commands: wide).read())
+        let deep = FakePF()
+        var parent = "com.apple"
+        for _ in 0..<8 {
+            let child = parent + "/nested"
+            deep.anchorListings[parent] = [child]
+            parent = child
+        }
+        XCTAssertThrowsError(try PFRuleInspector(commands: deep).read())
+        let changing = FakePF()
+        changing.changeTopologyAfterFirstRead = true
+        XCTAssertThrowsError(try PFRuleInspector(commands: changing).read())
+    }
+}
+
+final class PFPolicyCompilerTests: XCTestCase {
+    func testDryRunAcceptsExactPlatformAdvisoryWithMandatoryNoActionFlag() throws {
+        let pf = FakePF(), source = "block drop quick all label \"mamori-default-deny\"\n"
+        let advisory = pf.compileDiagnostics
+        let altq = "No ALTQ support in kernel\nALTQ related functions disabled\n"
+        for diagnostics in ["", altq, advisory, altq + advisory, advisory + altq] {
+            pf.compileDiagnostics = diagnostics
+            XCTAssertEqual(try pf.pfCompilePolicy(source), source)
+            XCTAssertEqual(pf.requests.last, ["-a", GuardIdentity.anchor, "-o", "none", "-n", "-v", "-f", "-"])
+        }
+        XCTAssertTrue(pf.mutations.isEmpty)
+    }
+    func testUnknownAndFailureDiagnosticsRemainRejected() {
+        let pf = FakePF(), advisory = pf.compileDiagnostics
+        for diagnostics in [advisory + "pfctl: syntax error\n", "pfctl: DIOCGETRULES: Invalid argument\n", "See /etc/pf.conf for further details.\n"] {
+            pf.compileDiagnostics = diagnostics
+            XCTAssertThrowsError(try pf.pfCompilePolicy("fixture"))
+        }
+        pf.compileDiagnostics = advisory
+        pf.compileExitCode = 1
+        XCTAssertThrowsError(try pf.pfCompilePolicy("fixture"))
+        XCTAssertTrue(pf.mutations.isEmpty)
+    }
+    func testRealReadbackDoesNotAcceptTheDryRunAdvisory() {
+        let pf = FakePF()
+        pf.readDiagnosticArguments = ["-s", "rules"]
+        pf.readDiagnostic = pf.compileDiagnostics
+        XCTAssertThrowsError(try pf.pfRead(["-s", "rules"]))
     }
 }
 
