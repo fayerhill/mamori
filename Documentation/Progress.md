@@ -4,7 +4,7 @@
 
 Updated: 2026-10-12 (Asia/Taipei)
 
-Status: **0.2.0 local development build**. The real guard and complete-uninstall paths are implemented. Build 4 is installed and launches with protection inactive. Service registration and the helper's earlier operation have been observed locally. Successful live enforcement and complete-uninstall integration remain unverified. The published `v0.1.0-preview` downloads remain the older, limited ad-hoc builds.
+Status: **0.2.0 local development build**. The real guard and complete-uninstall paths are implemented. Build 5 is installed and signature-verified; the latest app-picker alignment was checked in the safe preview. Service registration and the helper's earlier operation have been observed locally. Successful live enforcement and complete-uninstall integration remain unverified. The published `v0.1.0-preview` downloads remain the older, limited ad-hoc builds.
 
 ## Implemented
 
@@ -42,6 +42,16 @@ The source fix enumerates concrete anchors instead of relying on the wildcard re
 That probe also exposed an overly strict syntax diagnostic check. The dedicated policy compiler now accepts only the exact known generic `-f` notice and still rejects errors. Connected (nine-rule) and blocked (eight-rule) fixtures passed unprivileged syntax checks that require `-n`, so PF was not activated. The journal's syntax was not rechecked by the host probe after this correction. These are rule-reading and syntax results, not an enforcement test.
 
 The 89-test aggregate covers both corrections. Build 4 has completed release compilation, Apple Development signing, and static bundle validation following the user's macOS approval. The signed build is now installed as build 4; its initial home and Settings were observed without starting protection.
+
+## App picker alignment (build 5)
+
+App rows now fill the available width and align to the leading edge. Native checkboxes sit in a centered row beside the icon and text, including two-line status labels. Clicking either the checkbox or the app label updates the same selection; VoiceOver retains the app name, checked state, and status hint.
+
+The signed release build and static bundle validation passed. Native safe-preview inspection confirmed left alignment, vertical centering, and selection by checkbox and label. Build 5 replaced the stopped build 4 with a matching signing team and passed deep, strict signature verification. This small UI change did not rerun the earlier 89-test backend suite.
+
+中文：build 5 调整应用列表左对齐和复选框垂直居中，保留点击名称选择及无障碍状态提示。原生安全预览、编译和签名检查通过，更新版已安装。
+
+日本語：build 5 でアプリ行を左揃えにし、チェックボックスを垂直中央に配置しました。名前のクリックとアクセシビリティの状態通知も維持しています。安全なネイティブプレビュー、ビルド、署名検証を通過し、更新版をインストールしました。
 
 ## Remaining before a validated network-protection release
 
