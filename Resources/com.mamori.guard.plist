@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <key>Label</key><string>com.mamori.guard</string>
+    <key>BundleProgram</key><string>Contents/MacOS/MamoriGuard</string>
+    <key>MachServices</key><dict><key>com.mamori.guard</key><true/></dict>
+    <key>AssociatedBundleIdentifiers</key><array><string>com.mamori.app</string></array>
+</dict></plist>
