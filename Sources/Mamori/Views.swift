@@ -28,6 +28,10 @@ struct MamoriView: View {
         .alert(model.t(.error), isPresented: $model.showError) {
             Button(model.t(.done), role: .cancel) {}
         } message: { Text(model.errorMessage) }
+        .confirmationDialog(model.t(.completeUninstall), isPresented: $model.showUninstallConfirmation, titleVisibility: .visible) {
+            Button(model.t(.uninstallConfirm), role: .destructive) { model.completeUninstall() }
+            Button(model.t(.cancel), role: .cancel) {}
+        } message: { Text(model.t(.uninstallExplanation)) }
     }
 
     private var home: some View {
@@ -70,6 +74,7 @@ struct MamoriView: View {
                 }.buttonStyle(.plain).accessibilityIdentifier("awake-options")
                 Toggle(model.t(.keepAwake), isOn: Binding(get: { model.awakeEnabled }, set: model.setAwake))
                     .labelsHidden().toggleStyle(.switch).controlSize(.mini)
+                    .disabled(!model.canConfigure)
                     .accessibilityIdentifier("keep-awake-toggle")
             }.frame(height: 42)
             Hairline()
@@ -85,6 +90,7 @@ struct MamoriView: View {
                 Spacer(minLength: 2)
                 Toggle(model.t(.autoQuit), isOn: Binding(get: { model.autoQuitEnabled }, set: model.setAutoQuit))
                     .labelsHidden().toggleStyle(.switch).controlSize(.mini)
+                    .disabled(!model.canConfigure)
                     .accessibilityIdentifier("auto-quit-toggle").padding(.top, 5)
             }.padding(.vertical, 8).help(model.t(.appsExplanation))
             Hairline()
@@ -137,6 +143,7 @@ struct MamoriView: View {
                         Picker(model.t(.language), selection: $model.language) {
                             ForEach(AppLanguage.allCases) { Text($0.name).tag($0) }
                         }.labelsHidden().pickerStyle(.segmented).accessibilityIdentifier("language-picker")
+                            .disabled(!model.canConfigure)
                     }
                     VStack(alignment: .leading, spacing: 10) {
                         sectionLabel(.networkProtection)
@@ -150,6 +157,7 @@ struct MamoriView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Toggle(model.t(.forceQuit), isOn: $model.forceQuitEnabled).toggleStyle(.switch)
                             .font(.system(size: 13)).accessibilityIdentifier("force-quit-toggle")
+                            .disabled(!model.canConfigure)
                     }.help(model.t(.forceHelp))
                     if model.isDemo {
                         VStack(alignment: .leading, spacing: 12) {
@@ -160,6 +168,11 @@ struct MamoriView: View {
                                 .accessibilityIdentifier("reset-preview")
                         }
                     }
+                    Hairline()
+                    Button(model.t(model.uninstallInProgress ? .uninstalling : .completeUninstall), role: .destructive) {
+                        model.showUninstallConfirmation = true
+                    }.buttonStyle(.borderless).disabled(model.busy)
+                        .accessibilityIdentifier("complete-uninstall")
                     Text(model.t(.build)).font(.system(size: 10)).foregroundStyle(Theme.secondary)
                 }.padding(.bottom, 10)
             }.scrollIndicators(.hidden)
@@ -196,6 +209,7 @@ struct MamoriView: View {
             }
             Text(model.awakeSummary).foregroundStyle(Theme.accent).padding(.top, 14)
             }.help(model.t(.wakeHelp))
+            .disabled(!model.canConfigure)
             .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 8)
             }.scrollIndicators(.hidden)
             doneButton.padding(.top, 12)
@@ -238,6 +252,7 @@ struct MamoriView: View {
                                 }
                             }
                         }.toggleStyle(.checkbox).padding(.vertical, 8)
+                            .disabled(!model.canConfigure)
                             .accessibilityIdentifier("select-app-\(app.id)")
                         Hairline()
                     }
@@ -259,9 +274,28 @@ struct MamoriView: View {
                             Text(model.vpnSummary).font(.system(size: 12)).foregroundStyle(Theme.secondary)
                         }
                         Spacer()
-                        Button(model.t(.refresh)) { model.refreshConnection() }.buttonStyle(.borderless).font(.system(size: 12))
+                        Button(model.t(.refresh)) { model.detectConnection() }.buttonStyle(.borderless).font(.system(size: 12))
+                            .disabled(!model.canConfigure || model.guardIsActive)
                     }
                     Hairline()
+                    if !model.isDemo {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(model.helperSummary).font(.system(size: 11)).foregroundStyle(Theme.secondary)
+                            if !model.helperAvailable {
+                                Button(model.t(.installHelper)) { model.installHelper() }.buttonStyle(.borderless)
+                                    .disabled(!model.canConfigure || !model.canInstallHelper)
+                                    .accessibilityIdentifier("install-helper")
+                                if model.canInstallHelper {
+                                    Button(model.t(.approveHelper)) { model.approveHelper() }.buttonStyle(.borderless)
+                                        .disabled(!model.canConfigure)
+                                }
+                            } else {
+                                Button(model.t(.detectConnection)) { model.detectConnection() }.buttonStyle(.borderless)
+                                    .disabled(!model.canConfigure || model.guardIsActive)
+                                    .accessibilityIdentifier("detect-connection")
+                            }
+                        }
+                    }
                     VStack(alignment: .leading, spacing: 8) {
                         sectionLabel(.tunnel)
                         TextField("utun…", text: $model.tunnelInterface).textFieldStyle(.roundedBorder)
@@ -270,16 +304,10 @@ struct MamoriView: View {
                         TextField("203.0.113.10", text: $model.gatewayAddresses).textFieldStyle(.roundedBorder)
                             .accessibilityIdentifier("gateway-addresses")
                         Text(model.t(.gatewayHelp)).font(.system(size: 11)).foregroundStyle(Theme.secondary)
-                    }.disabled(model.guardIsActive || model.busy)
+                    }.disabled(model.guardIsActive || !model.canConfigure)
                     VStack(alignment: .leading, spacing: 10) {
-                        sectionLabel(.networkProtection)
-                        Text(model.helperSummary).font(.system(size: 12)).foregroundStyle(Theme.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if !model.isDemo {
-                            Button(model.t(.installHelper)) { model.installHelper() }.buttonStyle(.borderless)
-                                .disabled(model.busy).accessibilityIdentifier("install-helper")
-                        }
                         Text(model.t(.safetyNotice)).font(.system(size: 11)).foregroundStyle(Theme.secondary)
+                        Text(model.t(.manualDisconnectProtection)).font(.system(size: 11)).foregroundStyle(Theme.secondary)
                     }
                     DisclosureGroup(model.t(.details)) {
                         Text(model.connectionEvidence.joined(separator: "\n"))

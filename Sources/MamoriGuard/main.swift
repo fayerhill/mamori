@@ -1,6 +1,7 @@
 import Foundation
 import Security
 import MamoriCore
+import MamoriGuardSupport
 import Darwin
 
 // This executable is exclusively a packaged SMAppService daemon, never a setuid CLI.
@@ -11,7 +12,10 @@ guard geteuid() == 0 else {
 var ownCode: SecCode?
 var information: CFDictionary?
 var staticCode: SecStaticCode?
+var ownRequirement: SecRequirement?
 guard SecCodeCopySelf([], &ownCode) == errSecSuccess, let ownCode,
+      SecRequirementCreateWithString("anchor apple generic and identifier \"\(GuardIdentity.service)\"" as CFString, [], &ownRequirement) == errSecSuccess,
+      SecCodeCheckValidity(ownCode, [], ownRequirement) == errSecSuccess,
       SecCodeCopyStaticCode(ownCode, [], &staticCode) == errSecSuccess, let staticCode,
       SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &information) == errSecSuccess,
       let team = (information as? [String: Any])?[kSecCodeInfoTeamIdentifier as String] as? String,

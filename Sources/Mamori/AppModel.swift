@@ -12,7 +12,7 @@ final class AppModel: ObservableObject {
     @Published var screen = Screen.home
     @Published var appSearch = ""
     @Published var language: AppLanguage {
-        didSet { if !isDemo { preferences.set(language.rawValue, forKey: "language") } }
+        didSet { if !isDemo, !uninstallRequested { preferences.set(language.rawValue, forKey: "language") } }
     }
     @Published private(set) var session = SessionState()
     @Published private(set) var apps: [ApplicationSnapshot] = []
@@ -22,7 +22,10 @@ final class AppModel: ObservableObject {
     @Published private(set) var connectionEvidence: [String] = []
     @Published private(set) var backend = GuardStatus(phase: .unavailable, message: "Not checked")
     @Published private(set) var remainingSeconds = 0
+    @Published private var wakeReleaseFailed = false
     @Published private var setupBusy = false
+    @Published private(set) var uninstallInProgress = false
+    @Published var showUninstallConfirmation = false
     @Published var showError = false
     @Published var errorMessage = ""
     @Published var tunnelInterface = ""
@@ -57,6 +60,10 @@ final class AppModel: ObservableObject {
     private var wakeDeadline: ContinuousClock.Instant?
     private var rememberedApps: [String: ApplicationSnapshot] = [:]
     private var checkingBackend = false
+    private var backendCheckTask: Task<GuardStatus, Never>?
+    private var uninstallRequested = false
+    private var uninstallPlan: UninstallPlan?
+    private var backendRequest: UInt64 = 0
 
     init(demo: Bool = ProcessInfo.processInfo.arguments.contains("--demo") || Bundle.main.bundleIdentifier == "com.mamori.preview") {
         isDemo = demo
@@ -85,11 +92,13 @@ final class AppModel: ObservableObject {
     }
 
     func t(_ copy: Copy) -> String { copy.text(language) }
-    var awakeEnabled: Bool { session.wakeActive || session.wakeAcquiring }
+    var awakeEnabled: Bool { session.wakeActive || session.wakeAcquiring || wakeReleaseFailed }
     var autoQuitEnabled: Bool { session.autoQuitEnabled }
     var selectedAppIDs: Set<String> { session.selectedApplicationIDs }
     var helperAvailable: Bool { isDemo || backend.helperAvailable }
-    var busy: Bool { setupBusy || session.phase == .arming || session.phase == .restoring }
+    var busy: Bool { setupBusy || uninstallInProgress || session.phase == .arming || session.phase == .restoring }
+    var canConfigure: Bool { !busy && !session.wantsToQuit }
+    var canInstallHelper: Bool { !isDemo && guardClient?.canInstall == true }
     var guardIsActive: Bool { session.phase == .protected || session.phase == .blocked }
     var needsAttention: Bool { session.phase == .fault || session.phase == .blocked }
     var vpnName: String { "GlobalProtect" }
@@ -127,7 +136,7 @@ final class AppModel: ObservableObject {
         default: "shield.lefthalf.filled"
         }
     }
-    var primaryTitle: String { t(guardIsActive ? .stop : session.phase == .fault ? .retry : .start) }
+    var primaryTitle: String { t(guardIsActive ? .stop : session.phase == .fault || session.wantsToQuit ? .retry : .start) }
     var awakeSummary: String {
         guard awakeEnabled else { return t(.awakeOff) }
         if awakeMode == .always { return "\(t(.always)) · \(t(.untilQuit))" }
@@ -145,12 +154,19 @@ final class AppModel: ObservableObject {
     }
     var helperSummary: String {
         if isDemo { return t(.previewNotice) }
-        if backend.phase == .unavailable { return t(.platformNotice) }
-        return backend.helperAvailable ? t(.helperReady) : t(.helperNeeded)
+        if guardClient?.canInstall != true { return t(.platformNotice) }
+        return backend.helperAvailable ? t(.helperReady) : backend.message
     }
 
     func setAwake(_ enabled: Bool) {
-        guard !session.wantsToQuit else { return }
+        guard canConfigure else { return }
+        if !enabled, wakeReleaseFailed {
+            do {
+                try power?.disable()
+                wakeReleaseFailed = false
+                activeWakeTicket = nil
+            } catch { report(error.localizedDescription) }
+        }
         if enabled { applyAwakeChoice() } else { send(.setKeepAwake(.off)) }
     }
 
@@ -160,7 +176,7 @@ final class AppModel: ObservableObject {
     }
 
     func setAutoQuit(_ enabled: Bool) {
-        guard !session.wantsToQuit else { return }
+        guard canConfigure else { return }
         send(.setAutoQuit(enabled))
     }
 
@@ -169,7 +185,7 @@ final class AppModel: ObservableObject {
         var updated = selectedAppIDs
         if selected { updated.insert(id) } else { updated.remove(id) }
         send(.setSelectedApplications(updated))
-        if !isDemo { preferences.set(Array(updated).sorted(), forKey: "selectedApplications") }
+        if !isDemo, !uninstallRequested { preferences.set(Array(updated).sorted(), forKey: "selectedApplications") }
     }
 
     func refreshApps(force: Bool = false) {
@@ -190,17 +206,28 @@ final class AppModel: ObservableObject {
 
     func refreshConnection() {
         guard !isDemo, !session.wantsToQuit, let snapshot = observer?.snapshot() else { return }
+        recordConnectionEvidence(snapshot)
+    }
+
+    func recordConnectionEvidence(_ snapshot: VPNSnapshot) {
+        let changed = vpnState != snapshot.state
         vpnState = snapshot.state
         vpnConnected = snapshot.isConnected
         connectionEvidence = snapshot.evidence + [backend.message]
         if !guardIsActive, !busy, let interface = snapshot.interface { tunnelInterface = interface }
-        send(.vpnChanged(snapshot.state == .connected ? .connected : snapshot.state == .disconnected ? .disconnected : .unverified))
+        // Only the authenticated guard may claim enforcement or trigger app quitting.
+        // Local tunnel evidence requests a fresh check; it cannot overwrite a blocked guard.
+        if !isDemo, changed, guardIsActive { Task { [weak self] in await self?.checkBackend() } }
     }
 
     func toggleGuard() {
         guard !busy else { return }
+        if session.wantsToQuit {
+            if uninstallRequested { completeUninstall() }
+            else { beginQuit() }
+            return
+        }
         if session.phase == .fault { send(.retryRestoration); return }
-        guard !session.wantsToQuit else { return }
         if guardIsActive { send(.stopGuard); return }
         guard isDemo || helperAvailable else { screen = .connection; return }
         if !isDemo {
@@ -221,6 +248,7 @@ final class AppModel: ObservableObject {
         guard !isDemo, !busy, !session.wantsToQuit, let guardClient else { return }
         setupBusy = true
         setupTask = Task { [weak self] in
+            _ = await self?.backendCheckTask?.value
             let result = await guardClient.install()
             guard let self else { return }
             defer { setupBusy = false }
@@ -229,7 +257,32 @@ final class AppModel: ObservableObject {
             connectionEvidence = observer?.snapshot().evidence ?? []
             connectionEvidence.append(backend.message)
             if !backend.helperAvailable { report(backend.message) }
+            else { await discoverConnection(using: guardClient) }
         }
+    }
+
+    func approveHelper() { guardClient?.openApprovalSettings() }
+
+    func detectConnection() {
+        guard canConfigure, !guardIsActive else { return }
+        refreshConnection()
+        guard !isDemo, let guardClient, helperAvailable else { return }
+        setupBusy = true
+        setupTask = Task { [weak self] in
+            guard let self else { return }
+            defer { setupBusy = false }
+            await discoverConnection(using: guardClient)
+        }
+    }
+
+    private func discoverConnection(using client: GuardClient) async {
+        let discovery = await client.discoverConfiguration()
+        guard !session.wantsToQuit else { return }
+        connectionEvidence.append(discovery.message)
+        if let configuration = discovery.configuration {
+            tunnelInterface = configuration.tunnelInterface
+            gatewayAddresses = configuration.gatewayAddresses.joined(separator: ", ")
+        } else { report(discovery.message) }
     }
 
     func removeHelper() {
@@ -237,6 +290,7 @@ final class AppModel: ObservableObject {
         send(.setAutoQuit(false))
         setupBusy = true
         setupTask = Task { [weak self] in
+            _ = await self?.backendCheckTask?.value
             let result = await guardClient.uninstall()
             guard let self else { return }
             defer { setupBusy = false }
@@ -249,7 +303,48 @@ final class AppModel: ObservableObject {
 
     func requestQuit() { NSApplication.shared.terminate(nil) }
 
+    func completeUninstall() {
+        guard !busy else { return }
+        if isDemo {
+            report(t(.uninstallPreview))
+            return
+        }
+        do {
+            if uninstallPlan == nil { uninstallPlan = try UninstallService.prepare() }
+        } catch {
+            report(error.localizedDescription)
+            return
+        }
+        uninstallRequested = true
+        uninstallInProgress = true
+        NSApplication.shared.disableRelaunchOnLogin()
+        for window in NSApplication.shared.windows { window.isRestorable = false }
+        beginQuit()
+    }
+
+    private func finishUninstall() async {
+        guard let guardClient, let plan = uninstallPlan else {
+            uninstallInProgress = false
+            report(t(.uninstallFailed))
+            return
+        }
+        backend = await guardClient.uninstall()
+        guard backend.phase == .inactive else {
+            uninstallInProgress = false
+            report(backend.message)
+            return
+        }
+        do {
+            _ = try UninstallService.remove(plan)
+            onExit?()
+        } catch {
+            uninstallInProgress = false
+            report(error.localizedDescription)
+        }
+    }
+
     func beginQuit() {
+        backendRequest &+= 1
         pollTask?.cancel()
         pollTask = nil
         cancelPendingQuits()
@@ -292,8 +387,8 @@ final class AppModel: ObservableObject {
                 guard !Task.isCancelled, let self else { return }
                 updateCountdown()
                 cycle += 1
-                if cycle.isMultiple(of: 3) {
-                    refreshConnection()
+                refreshConnection()
+                if cycle.isMultiple(of: 2) {
                     if screen == .applications { refreshApps() }
                     reconcileApplicationQuits()
                     if !isDemo { await checkBackend() }
@@ -305,28 +400,45 @@ final class AppModel: ObservableObject {
     private func checkBackend() async {
         guard !checkingBackend, !session.wantsToQuit, !busy, let guardClient else { return }
         checkingBackend = true
-        let result = await guardClient.check()
+        let request = backendRequest
+        let operation = session.guardOperation
+        let check = Task { await guardClient.check() }
+        backendCheckTask = check
+        let result = await check.value
+        backendCheckTask = nil
         checkingBackend = false
-        guard !session.wantsToQuit, !busy else { return }
+        guard !session.wantsToQuit, !busy, request == backendRequest,
+              operation == session.guardOperation else { return }
         backend = result
         if session.phase == .idle, backend.isEnforcing || backend.phase == .fault {
             send(.existingGuardNeedsRestoration("An existing Mamori session needs restoration before starting again."))
         }
-        if guardIsActive, !backend.isEnforcing {
-            report(backend.message)
-            send(.backendFailed(backend.message))
+        if guardIsActive {
+            if backend.isEnforcing {
+                send(.vpnChanged(backendSignal))
+            } else {
+                report(backend.message)
+                send(.backendFailed(backend.message))
+            }
         }
     }
 
     private func send(_ event: SessionEvent) {
         let effects = SessionReducer.reduce(&session, event)
+        if session.phase == .fault { uninstallInProgress = false }
         for effect in effects { execute(effect) }
         onStatusChange?()
+    }
+
+    private var backendSignal: VPNConnectionSignal {
+        if backend.phase == .protected { return .connected }
+        return backend.vpnState == .disconnected ? .disconnected : .unverified
     }
 
     private func execute(_ effect: SessionEffect) {
         switch effect {
         case .activateGuard(let operation):
+            backendRequest &+= 1
             let configuration = GuardConfiguration(tunnelInterface: tunnelInterface, gatewayAddresses: parsedGateways)
             Task { [weak self] in
                 guard let self else { return }
@@ -334,13 +446,15 @@ final class AppModel: ObservableObject {
                     try? await Task.sleep(for: .milliseconds(200))
                     send(.guardActivationCompleted(operation: operation, result: .verified(vpnConnected ? .connected : .disconnected)))
                 } else if let guardClient {
+                    _ = await backendCheckTask?.value
                     backend = await guardClient.start(configuration: configuration)
-                    let result: GuardActivationResult = backend.isEnforcing ? .verified(backend.phase == .protected ? .connected : .disconnected) : .failed(backend.message)
+                    let result: GuardActivationResult = backend.isEnforcing ? .verified(backendSignal) : .failed(backend.message)
                     send(.guardActivationCompleted(operation: operation, result: result))
                     if !backend.isEnforcing { report(backend.message) }
                 }
             }
         case .restoreGuard(let operation):
+            backendRequest &+= 1
             Task { [weak self] in
                 guard let self else { return }
                 if isDemo {
@@ -348,6 +462,7 @@ final class AppModel: ObservableObject {
                     send(.restorationCompleted(operation: operation, success: true, message: nil))
                 } else if let guardClient {
                     await setupTask?.value
+                    _ = await backendCheckTask?.value
                     backend = await guardClient.stop()
                     let success = backend.phase == .inactive
                     send(.restorationCompleted(operation: operation, success: success, message: success ? nil : backend.message))
@@ -396,6 +511,7 @@ final class AppModel: ObservableObject {
             do {
                 try power?.enable()
                 activeWakeTicket = ticket
+                wakeReleaseFailed = false
                 send(.wakeAcquisitionCompleted(ticket: ticket, success: true))
             } catch {
                 send(.wakeAcquisitionCompleted(ticket: ticket, success: false))
@@ -406,7 +522,11 @@ final class AppModel: ObservableObject {
             do {
                 try power?.disable()
                 activeWakeTicket = nil
-            } catch { report(error.localizedDescription) }
+                wakeReleaseFailed = false
+            } catch {
+                wakeReleaseFailed = true
+                report(error.localizedDescription)
+            }
         case .scheduleWakeTimeout(let ticket, let seconds):
             wakeTimeout?.cancel()
             wakeDeadline = ContinuousClock.now.advanced(by: .seconds(seconds))
@@ -425,8 +545,15 @@ final class AppModel: ObservableObject {
             cancelPendingQuits()
             wakeTimeout?.cancel()
             pollTask?.cancel()
-            do { try power?.disable() } catch { errorMessage = error.localizedDescription }
-            onExit?()
+            do { try power?.disable(); wakeReleaseFailed = false }
+            catch {
+                uninstallInProgress = false
+                report(error.localizedDescription)
+                return
+            }
+            if uninstallRequested {
+                Task { [weak self] in await self?.finishUninstall() }
+            } else { onExit?() }
         }
     }
 

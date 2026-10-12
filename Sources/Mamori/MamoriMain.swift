@@ -26,12 +26,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var popover: NSPopover?
     private var window: NSWindow?
     private var waitingToQuit = false
+    private var readyToExit = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model = AppModel()
         model.onExit = { [weak self] in
             guard let self else { return }
+            readyToExit = true
             if waitingToQuit { NSApplication.shared.reply(toApplicationShouldTerminate: true) }
+            else { NSApplication.shared.terminate(nil) }
         }
         model.onStatusChange = { [weak self] in self?.updateStatusItem() }
         makeMainMenu()
@@ -95,7 +98,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateStatusItem() {
-        let image = NSImage(systemSymbolName: model.guardIsActive ? "checkmark.shield" : "shield", accessibilityDescription: "Mamori")
+        let symbol = model.needsAttention ? "exclamationmark.shield" : model.guardIsActive ? "checkmark.shield" : "shield"
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Mamori")
         image?.isTemplate = true
         statusItem?.button?.image = image
         statusItem?.button?.toolTip = "Mamori · \(model.title)"
@@ -108,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.backgroundColor = NSColor(Theme.background)
         window.contentView = NSHostingView(rootView: MamoriView(model: model))
         window.isReleasedWhenClosed = false
+        window.isRestorable = false
         window.center()
         window.makeKeyAndOrderFront(nil)
         self.window = window
@@ -115,13 +120,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard !waitingToQuit else { return .terminateLater }
+        if readyToExit { return .terminateNow }
+        if waitingToQuit {
+            if !model.busy { Task { [weak self] in self?.model.beginQuit() } }
+            return .terminateLater
+        }
         waitingToQuit = true
-        Task { [weak self] in self?.model.beginQuit() }
+        if !model.uninstallInProgress { Task { [weak self] in self?.model.beginQuit() } }
         return .terminateLater
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
     private func capturePreview(to directory: URL) async {
         guard model.isDemo else { return }
