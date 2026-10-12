@@ -9,7 +9,7 @@ final class GuardPolicyTests: XCTestCase {
         XCTAssertTrue(policy.hasSuffix("block drop quick all label \"mamori-default-deny\"\n"))
         XCTAssertFalse(policy.contains("keep state"))
         XCTAssertFalse(policy.contains("on en0"))
-        XCTAssertTrue(policy.contains("pass quick on utun9 all no state"))
+        XCTAssertTrue(policy.contains("pass quick on utun9 all flags any no state"))
     }
     func testDisconnectedPolicyDoesNotAllowAnyTunnelOrGeneralDNS() throws {
         let policy = try GuardPolicy.render(configuration, tunnelAllowed: false)
@@ -34,6 +34,26 @@ final class GuardPolicyTests: XCTestCase {
         XCTAssertThrowsError(try GuardPolicy.preflight(rootRules: root, recursiveRules: recursive, pfEnabled: true, stateCount: 0))
         XCTAssertThrowsError(try GuardPolicy.preflight(rootRules: "pass quick all\n" + root, recursiveRules: recursive, pfEnabled: false, stateCount: 0))
         XCTAssertThrowsError(try GuardPolicy.preflight(rootRules: root, recursiveRules: recursive + "pass all\n", pfEnabled: false, stateCount: 0))
+        let stockScrub = "scrub-anchor \"com.apple/*\" all fragment reassemble\n"
+        XCTAssertNoThrow(try GuardPolicy.preflight(rootRules: stockScrub + root, recursiveRules: stockScrub + recursive, pfEnabled: false, stateCount: 0))
+    }
+
+    func testPlatformNormalizedNoStatePolicyIsAcceptedWithoutWeakLabelOnlyMatching() throws {
+        // Captured from a non-mutating macOS pfctl -n -v parser invocation.
+        let normalized = """
+        pass quick on lo0 all no state label "mamori-loopback"
+        pass out quick inet proto udp from any port = 68 to 255.255.255.255 port = 67 no state label "mamori-dhcp-out"
+        pass in quick inet proto udp from any port = 67 to any port = 68 no state label "mamori-dhcp-in"
+        pass out quick inet proto tcp from any to 203.0.113.4 port = 443 no state label "mamori-vpn-tcp-out"
+        pass in quick inet proto tcp from 203.0.113.4 port = 443 to any no state label "mamori-vpn-tcp-in"
+        pass out quick inet proto udp from any to 203.0.113.4 port = 4501 no state label "mamori-vpn-udp-out"
+        pass in quick inet proto udp from 203.0.113.4 port = 4501 to any no state label "mamori-vpn-udp-in"
+        pass quick on utun9 all no state label "mamori-tunnel"
+        block drop quick all label "mamori-default-deny"
+        """
+        XCTAssertTrue(GuardPolicy.validCompiledPolicy(normalized, tunnelAllowed: true))
+        XCTAssertFalse(GuardPolicy.rulesMatch(normalized + "\npass quick all", normalized))
+        XCTAssertFalse(GuardPolicy.rulesMatch(normalized.replacingOccurrences(of: "203.0.113.4", with: "any"), normalized))
     }
     func testNewSiblingPassRuleInvalidatesEnforcement() throws {
         let rules = try GuardPolicy.render(configuration, tunnelAllowed: true)

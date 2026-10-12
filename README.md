@@ -10,89 +10,77 @@
   English · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a>
 </p>
 
-A small menu-bar companion for AI sessions, builds, and work that takes time.
+A small, native menu-bar companion for long AI sessions, builds, and research. Choose how long to keep your Mac awake, start a deliberate VPN guard session, and decide which apps should stop if the connection is lost. One compact panel, with a clear way to finish.
 
-Start a task, choose how long your Mac should stay awake, and get on with your day. Mamori puts a few useful controls in one quiet place, with a familiar Mac interface and an end to every session that you control.
+**[Get started with 0.2.0](Documentation/Signing.md)** · [Installation & removal](Documentation/Installation.md) · [Progress](Documentation/Progress.md)
 
-**[Download for Mac](https://github.com/fayerhill/mamori/releases/tag/v0.1.0-preview)** · [See what's next](Documentation/Progress.md)
+macOS 14+ · Apple silicon local build · English, 简体中文, 日本語
 
-Apple silicon · macOS 14+ · English, 简体中文, 日本語
-
-> **Development preview:** keep-awake and read-only GlobalProtect observation work in the normal app. Network blocking and automatic app quitting are currently available only as simulations in the separate Preview app.
+> **0.2.0 is a local development build.** Real helper setup, network guarding, optional app quitting, and complete uninstall are implemented. Live network and privileged lifecycle validation remain pending. There is no public notarized 0.2.0 download; the older preview is linked below.
 
 <p align="center">
-  <img src="Artifacts/home-en.png" alt="Mamori's compact native Mac panel with keep-awake and guarding controls in safe preview mode" width="280">
+  <img src="Artifacts/home-en.png" alt="Mamori's compact native panel in safe preview mode" width="280">
 </p>
 
-## For the work between “start” and “done”
+## Useful while the work takes its time
 
-An AI session needs another hour. A build is still running. A research task has more to do while you take a break. Keeping the Mac awake should take one decision, instead of another thing to keep checking.
+| Control | What it does |
+| --- | --- |
+| **Keep Mac Awake** | Keep the Mac awake while Mamori runs or for a chosen duration. The display can sleep and the screen can lock. |
+| **Guard GlobalProtect** | While guarding, the implementation retains its default-deny policy after either a manual or accidental VPN disconnection. The helper verifies enforcement and reports its state. |
+| **Quit selected apps** | Optionally quit running apps from your installed-app selection after a confirmed VPN loss. Off by default; uncertain evidence does not trigger quitting. Delayed force quit is a separate choice. |
+| **Restore & Quit** | Cancel queued app actions, release keep-awake, and wait for owned network resources to be restored before exiting. Settings remain for next time. |
+| **Complete Uninstall** | After confirmation, restore owned network resources, unregister the service, and permanently remove this running app and the current user's Mamori data. Failed cleanup stays visible. |
 
-Mamori helps with that small, practical part of the job. Set a duration, or keep your Mac awake while Mamori runs. Your display can still sleep, and your screen can still lock.
+Keep-awake and guarding are independent. Mamori does not reconnect the VPN or reopen apps. Selecting a browser or terminal covers the whole application, including all windows and sessions.
 
-## A little utility, with a clear point of view
+## Start with the current app
 
-**Be present without demanding attention.** Mamori lives in the menu bar. Its compact panel uses familiar macOS controls, system typography, and your light or dark appearance. You open it when you need it.
+1. **Build and sign 0.2.0** using the [signing guide](Documentation/Signing.md). A local Apple Development identity enables the real helper; an ad-hoc build cannot activate it.
+2. Extract the clean `build/Mamori.zip` into **Applications**, then open Mamori. Build scripts do not install or start its service.
+3. Connect GlobalProtect. In Mamori, choose **Set up protection**, then approve the background service in macOS when requested.
+4. Choose **Detect VPN connection**, review the discovered tunnel and gateway, then **Start guarding**. Startup validation belongs to the authenticated helper, not the menu-bar observation alone.
+5. Enable keep-awake and optional app quitting as needed. Use **Restore & Quit** when finished, or **Settings → Complete Uninstall** to remove the app.
 
-**Make every action a choice.** Keep-awake starts off. You choose the duration and the applications that matter to you. A timer ends on its own; quitting Mamori releases keep-awake. Closing the panel simply puts it away.
+This is a workflow for a controlled local evaluation. A valid signature, detected tunnel, or passing test suite is not proof of live packet protection.
 
-**Leave the Mac feeling like your Mac.** Keep-awake uses a temporary assertion rather than rewriting power preferences. Mamori does not edit shell profiles, PATH, DNS, proxy settings, or GlobalProtect configuration. There is no telemetry or automatic launch at login.
+## Small by choice
 
-The name brings together **Mamori, 守, and お守り**. It reflects the idea behind the project: a small companion you keep close, with clear controls and a modest footprint.
+**Quiet, familiar controls.** System typography, native controls, light and dark appearance, and three languages. Closing the panel puts it away; it does not stop the session.
 
-## What you can do
+**You decide what runs.** Keep-awake and automatic app quitting start off. There is no automatic login launch, VPN reconnection, or app restart. Mamori, VPN controls, and critical system components are excluded from the quit list.
 
-| Feature | Why it matters | Available today |
-| --- | --- | --- |
-| **Keep Mac Awake** | Choose a duration or keep the Mac awake while Mamori runs. Useful when a local task needs more time. | Works in the normal app. |
-| **A clear stopping point** | Turn keep-awake off, let the timer finish, or use Restore & Quit. Display sleep and screen locking remain available. | Works in the normal app. |
-| **VPN connection awareness** | Check what Mamori can observe about GlobalProtect from the same small panel. | Read-only observation; it does not enforce network protection. |
-| **Choose the apps that matter** | Search installed apps, including apps that are not running, and explore an optional response to a VPN drop. | Selection is available; automatic quitting is preview-only. |
-| **Explore a guarded session** | Try connected, disconnected, and recovery states before any real network action is involved. | Safe simulation only. |
+**A modest footprint.** No telemetry. No changes to shell profiles, PATH, DNS, proxies, GlobalProtect settings, or global power preferences. Complete Uninstall removes owned resources, not other copies, source code, other users' data, or macOS logs and authorization records. It deletes directly rather than using Trash.
 
-Keep-awake prevents idle system sleep. It does not override closing the lid or choosing Sleep, and it cannot guarantee that an AI service or remote job keeps running.
+## What has been verified
 
-## Try it in a minute
+**78 Swift tests and 6 synthetic bundle checks passed.** The local Apple-signed app builds, installs in Applications, and launches; native preview flows have been inspected in all three languages. See the [verification record](Documentation/Progress.md) for the exact scope.
 
-1. **[Download the DMG](https://github.com/fayerhill/mamori/releases/download/v0.1.0-preview/Mamori-macOS-arm64.dmg)** and drag the app you want into Applications.
-2. Open **Mamori** for real keep-awake controls, or **Mamori Preview** to explore the full interface safely.
-3. Choose **Always** or a custom duration. Use **Restore & Quit** when you're finished.
+Live VPN disconnection, PF activation, privileged service installation, and real complete-uninstall integration have **not** been validated. The current guard targets a narrow GlobalProtect configuration; split tunnels, proxies, and universal VPN compatibility are outside its scope. Two sampled routes do not prove full-tunnel coverage. Keep-awake does not override lid closure or explicit sleep, or guarantee remote AI uptime. Read the [network boundaries](Documentation/NetworkGuard.md) before evaluation.
 
-No Xcode, Homebrew, or Terminal setup is required for the downloads. Prefer a ZIP? The [release page](https://github.com/fayerhill/mamori/releases/tag/v0.1.0-preview) includes separate normal and preview apps, Quick Start guides, and checksums.
+## Older preview download
 
-**This release is an ad-hoc signed, non-notarized development build.** macOS may block first launch; see the [download guide](Documentation/Download.md). Preview reads the installed-app catalog, but its VPN, power, firewall, and quit effects are simulated. It will not disconnect your VPN or close your work apps.
+The published **[v0.1.0-preview](https://github.com/fayerhill/mamori/releases/tag/v0.1.0-preview)** is an older Apple silicon, ad-hoc signed, non-notarized build. Its normal app supports keep-awake and read-only observation; real guarding and automatic app quitting are unavailable. It does not contain the current 0.2.0 functionality.
 
-## Where Mamori is heading
-
-The next step is a small, explicit response to a lost VPN connection: retain a network block and, if you choose, quit selected apps. The current prototype starts with a narrow GlobalProtect configuration.
-
-**That protection is not active in the downloadable normal app.** It still needs a Developer ID signed background service and controlled live validation. Automatic app quitting depends on that guard. Universal VPN support and automatic reconnection are outside this MVP; a detected VPN is not a protection guarantee.
-
-Follow the [progress and roadmap](Documentation/Progress.md), or read the [network design and its limits](Documentation/NetworkGuard.md). The current record includes 34 passing core tests, native preview checks, and verified download packages. Live VPN enforcement has not been tested.
+See the [download guide](Documentation/Download.md) for that release. To explore the current interface safely, build the separate **Mamori Preview**: it simulates VPN, firewall, power, app-quit, and uninstall effects, reading only the installed-app catalog. For real guard evaluation, use the signed local build above.
 
 <details>
-<summary><strong>Build it, inspect it, or contribute</strong></summary>
+<summary><strong>Build, explore, contribute</strong></summary>
 
-The app uses SwiftUI, AppKit, and Swift Package Manager, with no remote package dependencies. Building requires Xcode with Swift 6 on macOS 14 or later.
+Requires Xcode with Swift 6. SwiftUI, AppKit, and Swift Package Manager; no remote package dependencies.
 
 ```sh
 git clone https://github.com/fayerhill/mamori.git
 cd mamori
-./Scripts/build.sh
+SIGNING_MODE=dev ./Scripts/build.sh
 ./Scripts/preview.sh
+./Scripts/test.sh
 ```
 
-Run isolated core tests with `./Scripts/test.sh`. Capture simulated screens with `./Scripts/preview.sh --capture /private/tmp/mamori-preview`. Package a completed build with `./Scripts/release.sh --dmg`.
+Use `SIGNING_MODE=adhoc` for a limited build without a signing identity. `auto` prefers Developer ID, then Apple Development, then ad-hoc. Public packaging rejects Apple Development builds. [Signing details](Documentation/Signing.md).
 
-| Module | Responsibility |
-| --- | --- |
-| `Sources/Mamori` | Interface, localization, and coordination. |
-| `Sources/MamoriCore` | Pure session state, VPN evidence, and guard policy. |
-| `Sources/MamoriSystem` | Native power, application, VPN, and XPC adapters. |
-| `Sources/MamoriGuard` | Experimental privileged network service and restoration. |
-
-Have an idea or something feels wrong? [Open an issue](https://github.com/fayerhill/mamori/issues) with your macOS version and what you expected. Keep private VPN addresses and credentials out of public reports.
+`Mamori` owns the interface, `MamoriCore` the session and policy, `MamoriSystem` native adapters, and `MamoriGuard` the privileged service. The next milestones are controlled integration tests and Developer ID signing with notarization. [Report an issue](https://github.com/fayerhill/mamori/issues) without private VPN addresses or credentials.
 
 </details>
 
-[Download guide](Documentation/Download.md) · [Installation & removal](Documentation/Installation.md) · [Behavior](Documentation/Behavior.md) · [Progress](Documentation/Progress.md)
+[Behavior](Documentation/Behavior.md) · [Network design](Documentation/NetworkGuard.md) · [Installation & removal](Documentation/Installation.md) · [Progress](Documentation/Progress.md)

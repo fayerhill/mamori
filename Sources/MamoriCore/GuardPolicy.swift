@@ -39,7 +39,7 @@ public enum GuardPolicy {
         try validate(configuration)
         let gateways = Array(Set(configuration.gatewayAddresses)).sorted().joined(separator: ", ")
         var rules = [
-            "pass quick on lo0 all no state label \"mamori-loopback\"",
+            "pass quick on lo0 all flags any no state label \"mamori-loopback\"",
             "pass out quick inet proto udp from any port 68 to 255.255.255.255 port 67 no state label \"mamori-dhcp-out\"",
             "pass in quick inet proto udp from any port 67 to any port 68 no state label \"mamori-dhcp-in\"",
             "pass out quick inet proto tcp to { \(gateways) } port 443 flags any no state label \"mamori-vpn-tcp-out\"",
@@ -47,7 +47,7 @@ public enum GuardPolicy {
             "pass out quick inet proto udp to { \(gateways) } port 4501 no state label \"mamori-vpn-udp-out\"",
             "pass in quick inet proto udp from { \(gateways) } port 4501 no state label \"mamori-vpn-udp-in\""
         ]
-        if tunnelAllowed { rules.append("pass quick on \(configuration.tunnelInterface) all no state label \"mamori-tunnel\"") }
+        if tunnelAllowed { rules.append("pass quick on \(configuration.tunnelInterface) all flags any no state label \"mamori-tunnel\"") }
         rules.append("block drop quick all label \"mamori-default-deny\"")
         return rules.joined(separator: "\n") + "\n"
     }
@@ -56,9 +56,11 @@ public enum GuardPolicy {
         guard !pfEnabled else { throw GuardPolicyError.alreadyEnabled }
         guard stateCount == 0 else { throw GuardPolicyError.existingStates }
         let root = meaningfulLines(rootRules)
-        guard root.count == 1, root[0] == "anchor \"com.apple/*\" all" else { throw GuardPolicyError.unsupportedPF }
+        guard root.filter({ $0 == "anchor \"com.apple/*\" all" }).count == 1,
+              root.last == "anchor \"com.apple/*\" all",
+              root.allSatisfy({ $0 == "anchor \"com.apple/*\" all" || isStockScrubAnchor($0) }) else { throw GuardPolicyError.unsupportedPF }
         guard meaningfulLines(recursiveRules).allSatisfy({ line in
-            line == "}" || line.hasPrefix("anchor \"")
+            line == "}" || line.hasPrefix("anchor \"") || isStockScrubAnchor(line)
         }) else { throw GuardPolicyError.competingRules }
     }
 
@@ -68,8 +70,29 @@ public enum GuardPolicy {
     }
 
     public static func containsOnlyOwnedFilterRules(_ recursiveRules: String, expectedOwnRules: String) -> Bool {
-        let active = meaningfulLines(recursiveRules).filter { $0 != "}" && !$0.hasPrefix("anchor \"") }
+        let active = meaningfulLines(recursiveRules).filter { $0 != "}" && !$0.hasPrefix("anchor \"") && !isStockScrubAnchor($0) }
         return active.sorted() == meaningfulLines(expectedOwnRules).sorted()
+    }
+
+    private static func isStockScrubAnchor(_ line: String) -> Bool {
+        line == "scrub-anchor \"com.apple/*\" all fragment reassemble" ||
+        line == "scrub-anchor \"com.apple/*\" all fragment reassemble {"
+    }
+
+    /// The parser and readback must agree in order, not merely contain our labels.
+    public static func rulesMatch(_ actual: String, _ expected: String) -> Bool {
+        let expectedLines = meaningfulLines(expected)
+        return !expectedLines.isEmpty && meaningfulLines(actual) == expectedLines
+    }
+
+    public static func validCompiledPolicy(_ rules: String, tunnelAllowed: Bool) -> Bool {
+        let lines = meaningfulLines(rules)
+        guard let last = lines.last, last.hasPrefix("block drop quick all"),
+              last.contains("label \"mamori-default-deny\""),
+              lines.filter({ $0.contains("label \"mamori-default-deny\"") }).count == 1,
+              !lines.contains(where: { $0.contains("keep state") || $0.contains("flags S/SA") }),
+              lines.dropLast().allSatisfy({ $0.hasPrefix("pass ") && $0.contains("quick") && $0.contains("no state") && $0.contains("label \"mamori-") }) else { return false }
+        return lines.contains(where: { $0.contains("label \"mamori-tunnel\"") }) == tunnelAllowed
     }
 
     /// Only an authenticated helper's inactive acknowledgment clears pending restoration.
@@ -96,7 +119,9 @@ public struct GuardJournal: Codable, Equatable, Sendable {
     public var enableRequested: Bool
     public var expectedRules: String
     public var rootRules: String
-    public init(configuration: GuardConfiguration, ownerUID: UInt32, desiredArmed: Bool = true, token: String? = nil, enableRequested: Bool = false, expectedRules: String = "", rootRules: String) {
+    public var pendingRules: String?
+    public var bootIdentifier: String?
+    public init(configuration: GuardConfiguration, ownerUID: UInt32, desiredArmed: Bool = true, token: String? = nil, enableRequested: Bool = false, expectedRules: String = "", rootRules: String, pendingRules: String? = nil, bootIdentifier: String? = nil) {
         self.configuration = configuration
         self.ownerUID = ownerUID
         self.desiredArmed = desiredArmed
@@ -104,5 +129,7 @@ public struct GuardJournal: Codable, Equatable, Sendable {
         self.enableRequested = enableRequested
         self.expectedRules = expectedRules
         self.rootRules = rootRules
+        self.pendingRules = pendingRules
+        self.bootIdentifier = bootIdentifier
     }
 }

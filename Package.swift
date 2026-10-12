@@ -14,7 +14,11 @@ let package = Package(
         .target(name: "MamoriCore"),
         .target(name: "MamoriSystem", dependencies: ["MamoriCore"]),
         .executableTarget(name: "Mamori", dependencies: ["MamoriCore", "MamoriSystem"]),
-        .executableTarget(name: "MamoriGuard", dependencies: ["MamoriCore"]),
-        .testTarget(name: "MamoriCoreTests", dependencies: ["MamoriCore"])
+        .target(name: "MamoriGuardSupport", dependencies: ["MamoriCore"], path: "Sources/MamoriGuard", exclude: ["main.swift"]),
+        .executableTarget(name: "MamoriGuard", dependencies: ["MamoriCore", "MamoriGuardSupport"], path: "Sources/MamoriGuard", exclude: ["GuardService.swift", "CommandRunner.swift", "JournalStore.swift", "GlobalProtectVerifier.swift"], sources: ["main.swift"]),
+        .testTarget(name: "MamoriCoreTests", dependencies: ["MamoriCore"]),
+        .testTarget(name: "MamoriGuardTests", dependencies: ["MamoriCore", "MamoriGuardSupport"]),
+        .testTarget(name: "MamoriSystemTests", dependencies: ["MamoriCore", "MamoriSystem"]),
+        .testTarget(name: "MamoriAppTests", dependencies: ["Mamori", "MamoriSystem"])
     ]
 )

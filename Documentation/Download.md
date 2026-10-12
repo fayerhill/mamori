@@ -1,6 +1,6 @@
 # Download and open Mamori
 
-Use the app assets attached to a GitHub release. GitHub's **Source code** archives contain the project for developers, not an installed app.
+The published `v0.1.0-preview` assets are an older limited build. Current 0.2.0 source adds signed local helper setup and complete uninstall; see [Signing.md](Signing.md) to build that version. Use the app assets attached to a GitHub release. GitHub's **Source code** archives contain the project for developers, not an installed app.
 
 | Download | Purpose |
 | --- | --- |
@@ -25,12 +25,12 @@ Use **Restore & Quit** before removing Mamori. A preview-only run installs no ba
 
 ## Maintainer packaging
 
-After building the final source, run:
+Choose the build type first. Public packaging accepts an explicitly limited ad-hoc preview or Developer ID Application signatures; it refuses local Apple Development builds. After building the final source, run:
 
 ```sh
 ./Scripts/release.sh
 ```
 
-Use `./Scripts/release.sh --dmg` to add a disk image. The script consumes the existing clean `build/Mamori.zip` and `build/Mamori Preview.zip`, verifies their signatures and matching architectures, includes a Quick Start guide, and writes assets plus `SHA256SUMS` into `build/release`. It does not rebuild, launch, install, publish, or notarize anything. The default build targets the host architecture; the packager derives the asset suffix from the actual binaries and rejects mismatched app/helper architectures.
+Use `./Scripts/release.sh --dmg` to add a disk image. The script consumes the existing clean `build/Mamori.zip` and `build/Mamori Preview.zip`, verifies their signatures and matching architectures, includes a Quick Start guide, and writes assets plus `SHA256SUMS` into `build/release`. It does not rebuild, launch, install, or publish. Notarization is opt-in through `--notarize KEYCHAIN_PROFILE`; that path uploads to Apple, requires acceptance, staples and validates the tickets, and updates release assets only on success. The default build targets the host architecture; the packager derives the asset suffix from the actual binaries and rejects mismatched app/helper architectures.
 
-Only upload files listed in the newly generated `SHA256SUMS`, together with that checksum file. Do not upload unfiltered build folders or stale assets. Current download instructions deliberately cover ad-hoc development builds; the script requires a guide update before accepting a future Developer ID distribution build.
+Only upload files listed in the newly generated `SHA256SUMS`, together with that checksum file. `RELEASE-INFO.txt` records the actual signing mode and notarization result. Do not upload unfiltered build folders, local Apple Development archives, or stale assets. Quick Start text is generated for the actual signature type; see [Signing.md](Signing.md) for the complete signed release workflow. No signing mode substitutes for controlled live VPN validation.

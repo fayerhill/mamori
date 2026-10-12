@@ -25,6 +25,9 @@ enum Copy: CaseIterable {
     case monitoring, connectionDetails, build, readyToTest, blockedDetail, protectedDetail
     case shuttingDown, error, retry, notRunning, gracefulOnly, quitRequested, forceRequested
     case noSelection, pending, configure, safetyNotice, platformNotice, durationLabel, searchApps
+    case completeUninstall, uninstallConfirm, uninstallExplanation, uninstalling, uninstallFailed, uninstallPreview, cancel
+    case approveHelper, detectConnection, manualDisconnectProtection
+    case tunnelHelp, gatewayRequired, gatewayInvalid
 
     func text(_ language: AppLanguage) -> String {
         let value: (String, String, String)
@@ -32,8 +35,8 @@ enum Copy: CaseIterable {
         case .tagline: value = ("QUIETLY KEEPS YOU SAFE", "安心守候", "そっと、見守る")
         case .ready: value = ("Ready to guard", "准备守护", "守る準備ができました")
         case .inactive: value = ("Protection inactive", "保护尚未开启", "保護はオフです")
-        case .protected: value = ("Guarding quietly", "正在静心守护", "静かに見守っています")
-        case .blocked: value = ("Connection paused", "连接已暂停", "通信を停止しました")
+        case .protected: value = ("Guarding", "守护中", "保護中")
+        case .blocked: value = ("Network blocked", "网络已阻断", "通信を遮断中")
         case .working: value = ("Preparing protection", "正在准备保护", "保護を準備しています")
         case .attention: value = ("Needs attention", "需要处理", "確認が必要です")
         case .vpnDetected: value = ("VPN detected", "已检测到 VPN", "VPN を検出しました")
@@ -75,6 +78,9 @@ enum Copy: CaseIterable {
         case .tunnel: value = ("VPN tunnel interface", "VPN 隧道接口", "VPN トンネルインターフェイス")
         case .gateways: value = ("VPN gateway addresses", "VPN 网关地址", "VPN ゲートウェイアドレス")
         case .gatewayHelp: value = ("Enter the exact public IP addresses of your VPN gateway, separated by commas. Only these endpoints are allowed outside the tunnel.", "输入 VPN 网关的公网 IP 地址，以逗号分隔。隧道外仅允许访问这些端点。", "VPN ゲートウェイの正確な公開 IP アドレスをカンマで区切って入力してください。トンネル外ではこの接続先のみ許可されます。")
+        case .tunnelHelp: value = ("Use Detect connection to find the active VPN tunnel, or enter its utun interface.", "点击「探测连接」查找当前 VPN 隧道，或填写其 utun 接口。", "「接続を検出」で現在の VPN トンネルを調べるか、utun インターフェイスを入力してください。")
+        case .gatewayRequired: value = ("Use Detect connection, or enter 1–8 VPN gateway IPv4 addresses.", "点击「探测连接」，或填写 1–8 个 VPN 网关 IPv4 地址。", "「接続を検出」を使うか、VPN ゲートウェイの IPv4 アドレスを 1～8 個入力してください。")
+        case .gatewayInvalid: value = ("Enter the VPN gateway's public IPv4 addresses, separated by commas. Hostnames and private addresses are not supported.", "请填写 VPN 网关的公网 IPv4 地址，以逗号分隔。当前不支持域名或私有地址。", "VPN ゲートウェイの公開 IPv4 アドレスをカンマで区切って入力してください。ホスト名とプライベートアドレスには対応していません。")
         case .refresh: value = ("Refresh", "刷新", "更新")
         case .details: value = ("Technical details", "技术信息", "技術情報")
         case .noEvidence: value = ("No connection evidence is available.", "暂无连接信息。", "接続情報を取得できません。")
@@ -86,7 +92,7 @@ enum Copy: CaseIterable {
         case .quitHelp: value = ("Stop auto-quit, release keep-awake, and restore Mamori's network rules before exiting. Closing this panel keeps Mamori running.", "停止自动退出应用、取消保醒并还原 Mamori 的网络规则后退出。关闭此面板不会退出 Mamori。", "アプリの自動終了とスリープ防止を停止し、Mamori のネットワークルールを復元してから終了します。このパネルを閉じても Mamori は動作を続けます。")
         case .monitoring: value = ("Waiting for the next VPN drop", "等待下一次 VPN 断开", "次の VPN 切断を待っています")
         case .connectionDetails: value = ("Connection details", "连接信息", "接続の詳細")
-        case .build: value = ("Mamori 0.1 · Local preview", "Mamori 0.1 · 本地预览", "Mamori 0.1 · ローカルプレビュー")
+        case .build: value = ("Mamori 0.2", "Mamori 0.2", "Mamori 0.2")
         case .readyToTest: value = ("Ready for a safe test", "可以开始安全测试", "安全なテストを開始できます")
         case .blockedDetail: value = ("VPN lost · Network blocked", "VPN 已断开 · 网络已阻断", "VPN 切断 · ネットワークを遮断中")
         case .protectedDetail: value = ("Traffic stays inside your VPN", "流量仅通过 VPN 传输", "通信は VPN 内に限定されています")
@@ -101,9 +107,19 @@ enum Copy: CaseIterable {
         case .pending: value = ("Please wait…", "请稍候…", "お待ちください…")
         case .configure: value = ("Configure protection", "配置保护", "保護を構成")
         case .safetyNotice: value = ("Protection starts only after the background service verifies its rules. Setup may require administrator approval.", "后台服务验证规则生效后才会开始保护。设置可能需要管理员授权。", "バックグラウンドサービスがルールを検証してから保護を開始します。設定には管理者の承認が必要な場合があります。")
-        case .platformNotice: value = ("This local build needs a signed background service for network protection. Keep-awake and the safe preview work now.", "本地版本需要签名的后台服务才能启用网络保护。保醒和安全预览现已可用。", "このローカルビルドでネットワーク保護を有効にするには、署名済みのバックグラウンドサービスが必要です。スリープ防止と安全なプレビューは利用できます。")
+        case .platformNotice: value = ("Use an Apple-signed Mamori build to set up network protection. Keep-awake remains available in this build.", "请使用 Apple 证书签名的 Mamori 版本设置网络保护。当前版本仍可使用保醒。", "ネットワーク保護には Apple 証明書で署名された Mamori が必要です。このビルドでもスリープ防止は利用できます。")
         case .durationLabel: value = ("Duration (1–10,080 minutes)", "时长（1–10,080 分钟）", "時間（1〜10,080 分）")
         case .searchApps: value = ("Search installed apps", "搜索已安装应用", "インストール済みアプリを検索")
+        case .completeUninstall: value = ("Complete Uninstall…", "完整卸载…", "完全にアンインストール…")
+        case .uninstallConfirm: value = ("Uninstall Mamori", "卸载 Mamori", "Mamori をアンインストール")
+        case .uninstallExplanation: value = ("Restore networking, stop keep-awake and auto-quit, then permanently delete this copy of Mamori, its background service, and its settings and caches for your account. This cannot be undone. macOS-managed logs and other copies are not removed.", "还原网络，停止保醒与自动退出应用，然后永久删除当前 Mamori、后台服务及当前账户下的设置和缓存。此操作无法撤销。不会删除 macOS 管理的系统日志或其他 App 副本。", "ネットワークを復元し、スリープ防止とアプリの自動終了を停止して、この Mamori とバックグラウンドサービス、現在のアカウントの設定とキャッシュを完全に削除します。この操作は取り消せません。macOS のシステムログや別のコピーは削除しません。")
+        case .uninstalling: value = ("Uninstalling…", "正在卸载…", "アンインストール中…")
+        case .uninstallFailed: value = ("Uninstall could not finish. Mamori is still open so you can retry.", "卸载未完成。Mamori 保持打开，你可以重试。", "アンインストールを完了できませんでした。再試行できるよう Mamori を開いたままにしています。")
+        case .uninstallPreview: value = ("Preview only: no app, settings, or background service was removed.", "仅为预览：未删除任何 App、设置或后台服务。", "プレビューのため、アプリ、設定、バックグラウンドサービスは削除していません。")
+        case .cancel: value = ("Cancel", "取消", "キャンセル")
+        case .approveHelper: value = ("Open macOS Approval Settings", "打开 macOS 授权设置", "macOS の承認設定を開く")
+        case .detectConnection: value = ("Detect VPN connection", "检测 VPN 连接", "VPN 接続を検出")
+        case .manualDisconnectProtection: value = ("While guarding, manual disconnects also block direct traffic. Stop guarding or Restore & Quit to allow normal networking.", "守护期间，手动断开 VPN 也会阻断直连。停止守护或还原并退出后恢复正常网络。", "保護中は手動で VPN を切断した場合も直接通信を遮断します。保護の停止、または復元して終了すると通常の通信に戻ります。")
         }
         switch language {
         case .english: return value.0

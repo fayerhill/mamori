@@ -30,6 +30,12 @@ Keep-awake choices are off, while Mamori runs, or a positive duration in seconds
 
 An acquisition failure returns the control to off and exposes an error. Changes and timeouts carry lease tickets; a stale acquisition success must release that specific lease, never a newer one. The adapter must make release idempotent and must honor the ticket. Duplicate completions for the current completed acquisition do nothing. Stopping the network guard or quitting selected apps leaves keep-awake active; normal Quit releases it and cancels its timer even when network restoration needs retry.
 
+## Complete uninstall
+
+Complete Uninstall is an explicit, confirmed Settings action. The controller stops new work, cancels app-quit timers, releases keep-awake, waits for verified PF restoration and daemon unregistration, then invokes a fixed-path local cleanup service. Cleanup permanently deletes the validated running production bundle and only the current user's Mamori preferences, caches, Application Support, and Saved Application State. It does not use Trash.
+
+The cleanup service refuses unsafe bundle identities, translocated/read-only installs, and protected paths it cannot remove. Failure reports incomplete cleanup and remaining paths; it does not request arbitrary root deletion or discard needed recovery state first. Source trees, downloads, other app copies, the Preview bundle, other users' files, OS logs, and system authorization records are outside its scope. Preview simulates the entire uninstall sequence.
+
 ## Verification boundary
 
 The unit tests run this reducer with synthetic completions, including reordered activation/restoration results, obsolete callbacks and timers, uncertain VPN evidence, selection changes, restore failures, and wake failures. They never alter PF, power settings, running apps, services, or connectivity. These tests prove orchestration behavior, not that a real VPN or packet filter enforces protection; physical network and lifecycle acceptance checks remain separate integration work.
