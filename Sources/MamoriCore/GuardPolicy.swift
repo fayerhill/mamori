@@ -52,16 +52,14 @@ public enum GuardPolicy {
         return rules.joined(separator: "\n") + "\n"
     }
 
-    public static func preflight(rootRules: String, recursiveRules: String, pfEnabled: Bool, stateCount: Int) throws {
+    public static func preflight(rootRules: String, anchorRules: [String: String], pfEnabled: Bool, stateCount: Int) throws {
         guard !pfEnabled else { throw GuardPolicyError.alreadyEnabled }
         guard stateCount == 0 else { throw GuardPolicyError.existingStates }
         let root = meaningfulLines(rootRules)
         guard root.filter({ $0 == "anchor \"com.apple/*\" all" }).count == 1,
               root.last == "anchor \"com.apple/*\" all",
               root.allSatisfy({ $0 == "anchor \"com.apple/*\" all" || isStockScrubAnchor($0) }) else { throw GuardPolicyError.unsupportedPF }
-        guard meaningfulLines(recursiveRules).allSatisfy({ line in
-            line == "}" || line.hasPrefix("anchor \"") || isStockScrubAnchor(line)
-        }) else { throw GuardPolicyError.competingRules }
+        guard containsOnlyOwnedFilterRules(anchorRules, expectedOwnRules: "") else { throw GuardPolicyError.competingRules }
     }
 
     public static func meaningfulLines(_ text: String) -> [String] {
@@ -69,14 +67,30 @@ public enum GuardPolicy {
             .filter { !$0.isEmpty && !$0.hasPrefix("#") }
     }
 
-    public static func containsOnlyOwnedFilterRules(_ recursiveRules: String, expectedOwnRules: String) -> Bool {
-        let active = meaningfulLines(recursiveRules).filter { $0 != "}" && !$0.hasPrefix("anchor \"") && !isStockScrubAnchor($0) }
-        return active.sorted() == meaningfulLines(expectedOwnRules).sorted()
+    public static func containsOnlyOwnedFilterRules(_ anchorRules: [String: String], expectedOwnRules: String) -> Bool {
+        guard anchorRules["com.apple"] != nil else { return false }
+        let expected = meaningfulLines(expectedOwnRules)
+        if !expected.isEmpty, anchorRules[GuardIdentity.anchor] == nil { return false }
+        for (path, rules) in anchorRules {
+            if path == GuardIdentity.anchor {
+                guard meaningfulLines(rules) == expected else { return false }
+            } else {
+                guard !path.hasPrefix(GuardIdentity.anchor + "/"), meaningfulLines(rules).allSatisfy(isPlainChildAnchor) else { return false }
+            }
+        }
+        return true
+    }
+
+    /// Only unconditional, immediate-child anchor calls are supported outside our
+    /// exact policy. Never discard arbitrary anchor syntax or deduplicate leaf rules.
+    private static func isPlainChildAnchor(_ line: String) -> Bool {
+        guard line.range(of: #"\Aanchor \"[A-Za-z0-9_.-]+(?:/\*)?\" all\z"#, options: .regularExpression) != nil else { return false }
+        let name = line.split(separator: "\"")[1].split(separator: "/")[0]
+        return name != "." && name != ".."
     }
 
     private static func isStockScrubAnchor(_ line: String) -> Bool {
-        line == "scrub-anchor \"com.apple/*\" all fragment reassemble" ||
-        line == "scrub-anchor \"com.apple/*\" all fragment reassemble {"
+        line == "scrub-anchor \"com.apple/*\" all fragment reassemble"
     }
 
     /// The parser and readback must agree in order, not merely contain our labels.

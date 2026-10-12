@@ -28,14 +28,14 @@ final class GuardPolicyTests: XCTestCase {
     }
     func testPreflightRejectsStateBypassAndCompetingFirewall() throws {
         let root = "anchor \"com.apple/*\" all\n"
-        let recursive = "anchor \"com.apple/*\" all {\n}\n"
-        XCTAssertNoThrow(try GuardPolicy.preflight(rootRules: root, recursiveRules: recursive, pfEnabled: false, stateCount: 0))
-        XCTAssertThrowsError(try GuardPolicy.preflight(rootRules: root, recursiveRules: recursive, pfEnabled: false, stateCount: 1))
-        XCTAssertThrowsError(try GuardPolicy.preflight(rootRules: root, recursiveRules: recursive, pfEnabled: true, stateCount: 0))
-        XCTAssertThrowsError(try GuardPolicy.preflight(rootRules: "pass quick all\n" + root, recursiveRules: recursive, pfEnabled: false, stateCount: 0))
-        XCTAssertThrowsError(try GuardPolicy.preflight(rootRules: root, recursiveRules: recursive + "pass all\n", pfEnabled: false, stateCount: 0))
+        let anchors = ["com.apple": "anchor \"200.AirDrop/*\" all\n", "com.apple/200.AirDrop": ""]
+        XCTAssertNoThrow(try GuardPolicy.preflight(rootRules: root, anchorRules: anchors, pfEnabled: false, stateCount: 0))
+        XCTAssertThrowsError(try GuardPolicy.preflight(rootRules: root, anchorRules: anchors, pfEnabled: false, stateCount: 1))
+        XCTAssertThrowsError(try GuardPolicy.preflight(rootRules: root, anchorRules: anchors, pfEnabled: true, stateCount: 0))
+        XCTAssertThrowsError(try GuardPolicy.preflight(rootRules: "pass quick all\n" + root, anchorRules: anchors, pfEnabled: false, stateCount: 0))
+        XCTAssertThrowsError(try GuardPolicy.preflight(rootRules: root, anchorRules: ["com.apple": "pass all\n"], pfEnabled: false, stateCount: 0))
         let stockScrub = "scrub-anchor \"com.apple/*\" all fragment reassemble\n"
-        XCTAssertNoThrow(try GuardPolicy.preflight(rootRules: stockScrub + root, recursiveRules: stockScrub + recursive, pfEnabled: false, stateCount: 0))
+        XCTAssertNoThrow(try GuardPolicy.preflight(rootRules: stockScrub + root, anchorRules: anchors, pfEnabled: false, stateCount: 0))
     }
 
     func testPlatformNormalizedNoStatePolicyIsAcceptedWithoutWeakLabelOnlyMatching() throws {
@@ -57,9 +57,31 @@ final class GuardPolicyTests: XCTestCase {
     }
     func testNewSiblingPassRuleInvalidatesEnforcement() throws {
         let rules = try GuardPolicy.render(configuration, tunnelAllowed: true)
-        let nested = "anchor \"com.apple/*\" all {\nanchor \"000.mamori\" all {\n" + rules + "}\n}\n"
-        XCTAssertTrue(GuardPolicy.containsOnlyOwnedFilterRules(nested, expectedOwnRules: rules))
-        XCTAssertFalse(GuardPolicy.containsOnlyOwnedFilterRules(nested + "pass quick all\n", expectedOwnRules: rules))
+        var anchors = ["com.apple": "anchor \"200.AirDrop/*\" all\n", "com.apple/200.AirDrop": "", GuardIdentity.anchor: rules]
+        XCTAssertTrue(GuardPolicy.containsOnlyOwnedFilterRules(anchors, expectedOwnRules: rules))
+        anchors["com.apple/200.AirDrop"] = "pass quick all\n"
+        XCTAssertFalse(GuardPolicy.containsOnlyOwnedFilterRules(anchors, expectedOwnRules: rules))
+    }
+    func testConcreteReadbackNeverDeduplicatesReordersOrIgnoresNestedForeignRules() throws {
+        let rules = try GuardPolicy.render(configuration, tunnelAllowed: true)
+        let valid = ["com.apple": "", GuardIdentity.anchor: rules]
+        for changed in [rules + "pass quick all\n", rules + rules, GuardPolicy.meaningfulLines(rules).reversed().joined(separator: "\n")] {
+            var anchors = valid
+            anchors[GuardIdentity.anchor] = changed
+            XCTAssertFalse(GuardPolicy.containsOnlyOwnedFilterRules(anchors, expectedOwnRules: rules))
+        }
+        for (path, content) in [
+            (GuardIdentity.anchor + "/hidden", ""),
+            ("com.apple/200.AirDrop/nested", "pass quick all"),
+            ("com.apple/200.AirDrop", "anchor \"elsewhere\" quick all"),
+            ("com.apple/200.AirDrop", "anchor \"../000.mamori\" all"),
+            ("com.apple/200.AirDrop", "anchor \"*\" all {\n}")
+        ] {
+            var anchors = valid
+            anchors[path] = content
+            XCTAssertFalse(GuardPolicy.containsOnlyOwnedFilterRules(anchors, expectedOwnRules: rules), path)
+        }
+        XCTAssertFalse(GuardPolicy.containsOnlyOwnedFilterRules(["com.apple": ""], expectedOwnRules: rules))
     }
     func testUnavailableHelperCannotErasePendingRestoration() {
         XCTAssertTrue(GuardPolicy.restorationRequired(previouslyPending: true, confirmedPhase: .unavailable))

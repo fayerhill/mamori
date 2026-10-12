@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import MamoriCore
 
 struct CommandResult: Sendable {
     let code: Int32
@@ -21,6 +22,33 @@ extension GuardCommandRunning {
     func pf(_ arguments: [String], input: String? = nil) throws -> String {
         let result = try run("/sbin/pfctl", arguments, input: input)
         guard result.code == 0 else { throw GuardFailure.message("PF could not complete the requested operation (\(result.code)).") }
+        return result.output
+    }
+    /// Readback must reject diagnostics even when pfctl incorrectly returns success.
+    func pfRead(_ arguments: [String], input: String? = nil) throws -> String {
+        let result = try run("/sbin/pfctl", arguments, input: input)
+        let diagnostics = result.error.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        guard result.code == 0,
+              diagnostics.isEmpty || diagnostics == ["No ALTQ support in kernel", "ALTQ related functions disabled"] else {
+            throw GuardFailure.message("PF inspection returned an error. Protection or restoration could not be confirmed.")
+        }
+        return result.output
+    }
+    /// The parser always receives -n. Only this non-mutating operation may accept
+    /// pfctl's unconditional -f advisory; real rule inspection stays strict.
+    func pfCompilePolicy(_ source: String) throws -> String {
+        let arguments = ["-a", GuardIdentity.anchor, "-o", "none", "-n", "-v", "-f", "-"]
+        let result = try run("/sbin/pfctl", arguments, input: source)
+        let diagnostics = result.error.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        let altq = ["No ALTQ support in kernel", "ALTQ related functions disabled"]
+        let advisory = [
+            "pfctl: Use of -f option, could result in flushing of rules",
+            "present in the main ruleset added by the system at startup.",
+            "See /etc/pf.conf for further details."
+        ]
+        guard result.code == 0, [[], altq, advisory, altq + advisory, advisory + altq].contains(diagnostics) else {
+            throw GuardFailure.message("The PF policy parser returned an error. Protection was not activated.")
+        }
         return result.output
     }
 }

@@ -230,12 +230,17 @@ struct MamoriView: View {
             }.padding(.bottom, 10)
             Hairline()
             ScrollView {
-                LazyVStack(spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     if model.filteredApps.isEmpty {
                         Text(model.t(.noApps)).foregroundStyle(Theme.secondary).padding(.vertical, 35)
                     }
                     ForEach(model.filteredApps) { app in
-                        Toggle(isOn: Binding(get: { model.selectedAppIDs.contains(app.id) }, set: { model.selectApp(app.id, selected: $0) })) {
+                        HStack(alignment: .center, spacing: 8) {
+                            Toggle(app.name, isOn: Binding(get: { model.selectedAppIDs.contains(app.id) }, set: { model.selectApp(app.id, selected: $0) }))
+                                .labelsHidden()
+                                .toggleStyle(.checkbox)
+                                .accessibilityIdentifier("select-app-\(app.id)")
+                                .accessibilityHint(Text(model.applicationNotes[app.id] ?? (app.isRunning ? "" : model.t(.notRunning))))
                             HStack(spacing: 12) {
                                 if let icon = model.icon(for: app) {
                                     Image(nsImage: icon).resizable().frame(width: 27, height: 27)
@@ -250,10 +255,17 @@ struct MamoriView: View {
                                         Text(model.t(.notRunning)).font(.system(size: 10)).foregroundStyle(Theme.secondary)
                                     }
                                 }
-                            }
-                        }.toggleStyle(.checkbox).padding(.vertical, 8)
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    guard model.canConfigure else { return }
+                                    model.selectApp(app.id, selected: !model.selectedAppIDs.contains(app.id))
+                                }
+                                .accessibilityHidden(true)
+                        }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 8)
                             .disabled(!model.canConfigure)
-                            .accessibilityIdentifier("select-app-\(app.id)")
                         Hairline()
                     }
                 }
