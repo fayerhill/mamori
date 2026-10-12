@@ -10,89 +10,77 @@
   <a href="README.md">English</a> · 简体中文 · <a href="README.ja.md">日本語</a>
 </p>
 
-Mamori 是一个轻巧的原生 macOS 菜单栏工具。开始一段 AI 工作、等待构建，或整理需要较长时间的研究资料时，打开保醒，选好时长，然后继续做你的事。
+Mamori 是一个轻巧的原生菜单栏工具，陪你完成较长的 AI 任务、构建和研究。选好保醒时长，主动开启 VPN 守护，再决定断线后哪些应用需要退出。操作集中在一个小面板里，结束时也有明确的退出路径。
 
-它留在菜单栏里。你需要时，点开一个小面板；工作结束时，明确地停止或退出。
+**[开始使用 0.2.0](Documentation/Signing.md)** · [安装与移除](Documentation/Installation.md) · [开发进度](Documentation/Progress.md)
 
-> **当前源码版本为 0.2.0。** 使用有效 Apple 签名的本地构建已包含真实后台服务设置、网络守护、可选应用退出和完整卸载，仍待受控环境中的真实验证。下方公开下载的 **v0.1.0-preview** 是旧版 ad-hoc 构建，仅提供实际保醒、只读观察和模拟守护。面向公众的正式签名分发仍需要 Developer ID 与公证。
+macOS 14+ · Apple Silicon 本地构建 · 英语、简体中文、日语
+
+> **0.2.0 是本地开发版本。** 已实现真实后台服务设置、网络守护、可选应用退出和完整卸载；真实网络及特权服务生命周期仍待验证。目前没有公开且已公证的 0.2.0 安装包，下方另附旧版预览下载。
 
 <p align="center">
-  <img src="Artifacts/home-zh-Hans.png" alt="Mamori 简体中文界面，展示保醒与模拟守护选项" width="280">
+  <img src="Artifacts/home-zh-Hans.png" alt="Mamori 简体中文安全预览界面" width="280">
 </p>
 
-## 适合这些时候
+## 让需要时间的工作，少一件要操心的事
 
-- **让 AI 继续工作。** 给较长的编程、分析或资料整理任务留出时间，减少因 Mac 自动睡眠而中断本地运行的情况。
-- **等待构建或导出。** 设定一段保醒时间，不必为了一个任务改动系统的长期电源设置。
-- **离开桌面一会儿。** 屏幕可以熄灭，Mac 也可以锁屏；保醒不要求你一直亮着屏幕。
-
-Mamori 防止的是自动空闲睡眠。它不保证阻止合盖、主动睡眠、关机或低电量睡眠，也不能保证远端 AI 服务或任务持续运行。
-
-## 小，但把控制交给你
-
-**只保醒你需要的时间。** 选择在 Mamori 运行期间持续保醒，或设定自定义时长。计时结束会停止，退出应用也会释放保醒。关闭小面板则不会退出菜单栏应用。
-
-**熟悉的 Mac 界面。** 原生控件、紧凑布局和浅色／深色外观；支持英语、简体中文和日语。日常操作不需要打开终端。
-
-**看得见当前状态。** 应用只读观察 GlobalProtect；启用签名后台服务后，守护状态以服务的实际验证结果为准。设置服务后可只读探测网关与隧道，再由你决定开始。检测到 VPN 本身并不代表已有防火墙保护。
-
-**先体验，再决定。** 单独的 Mamori Preview 始终模拟 VPN、保醒、防火墙和应用退出。签名本地版则可在守护开启后，按明确确认的断线事件退出已选且正在运行的应用；无法读取连接证据时不会误当作确认断线。应用选择器也支持尚未运行的应用，选中本身不会启动或退出它们。
-
-**退出与卸载都有明确结果。** 设置中的「完整卸载」需要确认：先释放保醒、确认网络还原并注销服务，再永久删除当前运行的应用副本和本用户的自有偏好、缓存、支持文件及保存状态。它不移入废纸篓，也不删除源码、其他副本、其他用户数据或系统日志。失败会显示未完成；预览版只模拟。
-
-## 安静，是一种选择
-
-Mamori 围绕一段由你开始、由你结束的工作时间设计。保醒与网络守护各自独立，不会因为切换一个功能，就悄悄改变另一个功能的状态。
-
-它不自动重连 VPN，不自动重开已退出的应用，也不在登录时自行启动。没有账号、遥测或后台数据上传；不改动你的 DNS、代理、GlobalProtect 设置或 Shell 配置。
-
-我们希望保留的是明确的状态、直接的操作和可靠的退出路径。更多开关，只有在确实有用时才加入。
-
-## 下载并开始
-
-**[下载 macOS DMG](https://github.com/fayerhill/mamori/releases/download/v0.1.0-preview/Mamori-macOS-arm64.dmg)** · [v0.1.0-preview 发布说明与校验文件](https://github.com/fayerhill/mamori/releases/tag/v0.1.0-preview)
-
-下方下载是旧版 **v0.1.0-preview**，适用于 **Apple Silicon、macOS 14 或更新版本**，采用 **ad-hoc 签名且尚未公证**。它不包含当前 0.2.0 本地签名构建的完整功能，也不应当作已验证的网络防护产品。当前版本见[本地签名构建说明](Documentation/Signing.md)。
-
-1. 下载并打开 DMG，将需要的应用拖入 **Applications**。
-2. 打开 **Mamori**，点击菜单栏的盾牌，开启保醒并选择时长。想先试界面，可以打开 **Mamori Preview**。
-3. 工作结束后关闭保醒，或选择 **还原并退出**。
-
-DMG 包含两个应用：
-
-| 应用 | 用途 |
+| 操作 | 功能 |
 | --- | --- |
-| **Mamori** | 实际保醒与只读 GlobalProtect 观察；保醒默认关闭。 |
-| **Mamori Preview** | 模拟守护流程；不改变真实 VPN、防火墙、电源断言或其他应用。 |
+| **保持 Mac 唤醒** | 在 Mamori 运行期间或指定时长内保醒。屏幕仍可熄灭，也可以锁屏。 |
+| **守护 GlobalProtect** | 守护开启后，无论主动断开还是意外掉线，实现都会保留默认拒绝策略，由后台服务验证规则并报告状态。 |
+| **退出所选应用** | 确认 VPN 断线后，可退出已选且正在运行的应用。默认关闭；证据不明时不会触发退出，延时强退需单独选择。 |
+| **还原并退出** | 取消待执行的应用操作、释放保醒，并等待自有网络资源还原后退出。偏好设置留待下次使用。 |
+| **完整卸载** | 确认后还原自有网络资源、注销服务，再永久删除当前运行的应用及本用户的 Mamori 数据。清理失败会明确显示。 |
 
-安装无需 Xcode、Homebrew 或命令行配置。如果 macOS 阻止打开，请先阅读[下载说明](Documentation/Download.md)，再自行判断是否信任此开发构建；无需关闭 Gatekeeper。
+保醒和网络守护各自独立。Mamori 不自动重连 VPN，也不重开已退出的应用。选择浏览器或终端，意味着整个应用及其所有窗口和会话。
 
-## 正在走向哪里
+## 从当前版本开始
 
-当前源码已实现后台服务设置、断线时保留默认拒绝策略、可选应用退出和完整卸载。本地 Apple Development 签名可以用于开发验证；面向公众的签名分发仍待 Developer ID 与公证。实际安装、断网行为、恢复与卸载需要在单独授权的测试环境中验证，不能用编译或签名通过代替。
+1. 按[签名指南](Documentation/Signing.md)**构建并签名 0.2.0**。本地 Apple Development 身份可启用真实服务；ad-hoc 构建无法启用。
+2. 将干净的 `build/Mamori.zip` 解压到 **Applications**，再打开 Mamori。构建脚本不会安装或启动后台服务。
+3. 连接 GlobalProtect，在 Mamori 中选择**设置保护服务**，按提示在 macOS 中批准后台服务。
+4. 选择**检测 VPN 连接**，检查识别出的隧道和网关，再点击**开始守护**。启动校验由经过身份认证的后台服务负责，不能仅凭菜单栏的观察结果放行。
+5. 按需开启保醒和自动退出。工作结束时选择**还原并退出**；需要移除应用时，选择**设置 → 完整卸载**。
 
-自动退出只处理明确选中的应用，不会自动恢复它们。选择浏览器或终端意味着整个应用及其所有窗口；关键系统组件、Mamori 自身和 VPN 控制组件不在可退出名单中。当前不承诺支持所有 VPN、代理或网络配置，也不承诺零泄漏。
+这是一条用于受控本地评估的流程。签名有效、检测到隧道或测试通过，都不能代替真实的数据包验证。
 
-[查看开发进度与里程碑](Documentation/Progress.md)
+## 小，是一种选择
+
+**熟悉而安静。** 系统字体、原生控件、浅色／深色外观和三种语言。关闭面板只是收起界面，不会结束会话。
+
+**由你决定。** 保醒和自动退出默认关闭；不自动登录启动、重连 VPN 或重开应用。Mamori 自身、VPN 控制组件和关键系统组件不在可退出名单中。
+
+**只管理自己的东西。** 没有遥测；不改 Shell 配置、PATH、DNS、代理、GlobalProtect 设置或全局电源偏好。完整卸载只移除自有资源，不删除其他副本、源码、其他用户数据或 macOS 日志与授权记录；应用直接删除，不移入废纸篓。
+
+## 已经验证了什么
+
+**78 项 Swift 测试和 6 项合成应用包检查通过。** 本地 Apple 签名版已完成构建、安装到 Applications 并启动；三种语言的原生安全预览流程已检查。具体范围见[验证记录](Documentation/Progress.md)。
+
+真实 VPN 断线、PF 规则启用、特权服务安装及真实完整卸载集成仍**未经验证**。当前守护针对有限的 GlobalProtect 配置，不涵盖分流、纯代理或所有 VPN。两条抽样路由不能证明全隧道覆盖。保醒也不会阻止合盖或主动睡眠，更不能保证远端 AI 任务持续运行。评估前请阅读[网络边界](Documentation/NetworkGuard.md)。
+
+## 旧版预览下载
+
+公开的 **[v0.1.0-preview](https://github.com/fayerhill/mamori/releases/tag/v0.1.0-preview)** 是面向 Apple Silicon 的旧版 ad-hoc 签名、未公证构建。普通版提供实际保醒和只读观察，不能启用真实守护或自动退出，也不包含当前 0.2.0 的完整功能。
+
+旧版安装方式见[下载说明](Documentation/Download.md)。想安全体验当前界面，可构建独立的 **Mamori Preview**：它模拟 VPN、防火墙、保醒、应用退出和卸载，只读取已安装应用目录。评估真实守护时，请使用上方的签名本地构建。
 
 <details>
-<summary>开发者：本地构建与技术文档</summary>
+<summary><strong>开发、探索与参与</strong></summary>
 
-需要 Xcode 和 Swift 6。项目使用 Swift Package Manager，没有第三方软件包依赖。
+需要支持 Swift 6 的 Xcode。项目使用 SwiftUI、AppKit 和 Swift Package Manager，没有远程软件包依赖。
 
 ```sh
 git clone https://github.com/fayerhill/mamori.git
 cd mamori
-./Scripts/build.sh
+SIGNING_MODE=dev ./Scripts/build.sh
 ./Scripts/preview.sh
+./Scripts/test.sh
 ```
 
-构建默认自动选择可用的 Developer ID、Apple Development 或 ad-hoc 签名。使用 `SIGNING_MODE=dev` 构建带真实服务的本地开发版，使用 `SIGNING_MODE=adhoc` 构建功能受限的预览版；公开打包脚本拒绝 Apple Development 构建。详见[签名说明](Documentation/Signing.md)。预览不要求断开真实 VPN；隔离测试通过也不等于真实网络阻断已获验证。
+没有签名身份时，可用 `SIGNING_MODE=adhoc` 构建功能受限版本。`auto` 依次选择 Developer ID、Apple Development 和 ad-hoc；公开打包流程拒绝 Apple Development 构建。详见[签名说明](Documentation/Signing.md)。
 
-- [构建、安装与移除](Documentation/Installation.md)
-- [生命周期与行为约定](Documentation/Behavior.md)
-- [网络守护的架构、前提与限制](Documentation/NetworkGuard.md)
-
-代码与代码注释使用英语。若将来安装了真实后台服务，移除应用前必须先确认网络资源已还原，再移除服务；不要删除尚待恢复的记录。
+`Mamori` 负责界面，`MamoriCore` 负责会话和策略，`MamoriSystem` 负责系统适配，`MamoriGuard` 负责特权服务。下一步是受控集成验证，以及 Developer ID 签名和公证。欢迎[反馈问题](https://github.com/fayerhill/mamori/issues)，请勿公开私有 VPN 地址或凭证。
 
 </details>
+
+[行为约定](Documentation/Behavior.md) · [网络设计](Documentation/NetworkGuard.md) · [安装与移除](Documentation/Installation.md) · [开发进度](Documentation/Progress.md)
