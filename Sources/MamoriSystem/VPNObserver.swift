@@ -36,14 +36,13 @@ public struct VPNSnapshot: Sendable {
 /// A read-only observer. The caller schedules sampling and decides how to react.
 @MainActor
 public final class VPNObserver {
-    private static let globalProtectBundleID = "com.paloaltonetworks.globalprotect"
     private var previouslyConfirmed = false
 
     public init() {}
 
     public func snapshot() -> VPNSnapshot {
         let clientRunning = NSWorkspace.shared.runningApplications.contains {
-            $0.bundleIdentifier?.lowercased() == Self.globalProtectBundleID && !$0.isTerminated
+            Self.isGlobalProtectClient($0.bundleIdentifier) && !$0.isTerminated
         }
         var evidence = [clientRunning ? "GlobalProtect client is running." : "GlobalProtect client is not visible."]
         guard let store = SCDynamicStoreCreate(nil, "com.mamori.vpn-observer" as CFString, nil, nil),
@@ -113,6 +112,13 @@ public final class VPNObserver {
             interface: interface,
             evidence: evidence
         )
+    }
+
+    /// Advisory client recognition only. The helper independently verifies the signed service.
+    nonisolated static func isGlobalProtectClient(_ bundleIdentifier: String?) -> Bool {
+        guard let identifier = bundleIdentifier?.lowercased() else { return false }
+        return identifier == "com.paloaltonetworks.globalprotect" ||
+            identifier == "com.paloaltonetworks.globalprotect.client"
     }
 
     private static func isGlobalProtectKey(_ key: String) -> Bool {

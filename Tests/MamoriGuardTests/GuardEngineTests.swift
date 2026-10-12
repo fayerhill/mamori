@@ -113,6 +113,18 @@ final class GuardEngineTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(blocked.phase, .blocked)
         XCTAssertEqual(blocked.vpnState, .unconfirmed)
     }
+    func testInitialStartRequiresConfirmedHelperVPNEvidenceBeforeAnyMutation() async throws {
+        for evidence in [GuardVPNState.unconfirmed, .disconnected] {
+            let pf = FakePF(), store = MemoryJournal(), vpn = FakeVPN()
+            vpn.connection = evidence
+            let result = try await request(engine(pf, store, vpn), "start")
+            XCTAssertEqual(result.phase, .fault, "Unexpected activation for \(evidence)")
+            XCTAssertTrue(pf.mutations.isEmpty, "PF changed with \(evidence) VPN evidence")
+            XCTAssertFalse(pf.enabled)
+            XCTAssertNil(store.value, "A journal was created before confirming the VPN")
+            XCTAssertFalse(store.removed)
+        }
+    }
     func testUnexpectedLoadedRuleNeverEnablesPF() async throws {
         let pf = FakePF(), store = MemoryJournal()
         pf.corruptLoad = true

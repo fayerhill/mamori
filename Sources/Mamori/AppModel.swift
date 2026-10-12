@@ -230,14 +230,33 @@ final class AppModel: ObservableObject {
         if session.phase == .fault { send(.retryRestoration); return }
         if guardIsActive { send(.stopGuard); return }
         guard isDemo || helperAvailable else { screen = .connection; return }
-        if !isDemo {
-            guard vpnConnected, !tunnelInterface.isEmpty, !parsedGateways.isEmpty else {
-                screen = .connection
-                report(t(.vpnUnconfirmed) + ". " + t(.gatewayHelp))
-                return
-            }
-        }
+        if !isDemo, !validateGuardInput() { return }
         send(.startGuard)
+    }
+
+    /// The observer is advisory. The authenticated helper verifies the actual
+    /// GlobalProtect connection before making any firewall changes.
+    func validateGuardInput() -> Bool {
+        do {
+            try GuardPolicy.validate(guardConfiguration)
+            return true
+        } catch {
+            screen = .connection
+            switch error as? GuardPolicyError {
+            case .invalidTunnel: report(t(.tunnelHelp))
+            case .noGateway: report(t(.gatewayRequired))
+            case .invalidGateway: report(t(.gatewayInvalid))
+            default: report(error.localizedDescription)
+            }
+            return false
+        }
+    }
+
+    private var guardConfiguration: GuardConfiguration {
+        GuardConfiguration(
+            tunnelInterface: tunnelInterface.trimmingCharacters(in: .whitespacesAndNewlines),
+            gatewayAddresses: parsedGateways
+        )
     }
 
     private var parsedGateways: [String] {
@@ -439,7 +458,7 @@ final class AppModel: ObservableObject {
         switch effect {
         case .activateGuard(let operation):
             backendRequest &+= 1
-            let configuration = GuardConfiguration(tunnelInterface: tunnelInterface, gatewayAddresses: parsedGateways)
+            let configuration = guardConfiguration
             Task { [weak self] in
                 guard let self else { return }
                 if isDemo {

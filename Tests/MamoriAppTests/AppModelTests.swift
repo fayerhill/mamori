@@ -76,6 +76,41 @@ final class AppModelTests: XCTestCase {
         XCTAssertNotEqual(Copy.completeUninstall.text(.english), Copy.completeUninstall.text(.japanese))
     }
 
+    func testUnconfirmedObserverDoesNotVetoConfigurationForHelperVerification() async {
+        let model = AppModel(demo: true)
+        model.recordConnectionEvidence(VPNSnapshot(state: .unconfirmed, label: "Client not visible", evidence: []))
+        model.tunnelInterface = " utun9 "
+        model.gatewayAddresses = "203.0.113.10, 203.0.113.11"
+        XCTAssertFalse(model.vpnConnected)
+        XCTAssertTrue(model.validateGuardInput())
+        XCTAssertFalse(model.showError)
+        // Accepting input never claims enforcement; the helper must still verify it.
+        XCTAssertEqual(model.session.phase, .idle)
+        await stop(model)
+    }
+
+    func testMissingTunnelDoesNotAskForAnAlreadyEnteredGateway() async {
+        let model = AppModel(demo: true)
+        model.tunnelInterface = ""
+        model.gatewayAddresses = "203.0.113.10"
+        XCTAssertFalse(model.validateGuardInput())
+        XCTAssertEqual(model.errorMessage, model.t(.tunnelHelp))
+        XCTAssertEqual(model.screen, .connection)
+        await stop(model)
+    }
+
+    func testMissingAndInvalidGatewaysHaveDistinctGuidance() async {
+        let model = AppModel(demo: true)
+        model.tunnelInterface = "utun9"
+        model.gatewayAddresses = ""
+        XCTAssertFalse(model.validateGuardInput())
+        XCTAssertEqual(model.errorMessage, model.t(.gatewayRequired))
+        model.gatewayAddresses = "vpn.example.com"
+        XCTAssertFalse(model.validateGuardInput())
+        XCTAssertEqual(model.errorMessage, model.t(.gatewayInvalid))
+        await stop(model)
+    }
+
     private func settle() async { try? await Task.sleep(for: .milliseconds(400)) }
 
     private func stop(_ model: AppModel) async {

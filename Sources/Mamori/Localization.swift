@@ -27,6 +27,7 @@ enum Copy: CaseIterable {
     case noSelection, pending, configure, safetyNotice, platformNotice, durationLabel, searchApps
     case completeUninstall, uninstallConfirm, uninstallExplanation, uninstalling, uninstallFailed, uninstallPreview, cancel
     case approveHelper, detectConnection, manualDisconnectProtection
+    case tunnelHelp, gatewayRequired, gatewayInvalid
 
     func text(_ language: AppLanguage) -> String {
         let value: (String, String, String)
@@ -77,6 +78,9 @@ enum Copy: CaseIterable {
         case .tunnel: value = ("VPN tunnel interface", "VPN 隧道接口", "VPN トンネルインターフェイス")
         case .gateways: value = ("VPN gateway addresses", "VPN 网关地址", "VPN ゲートウェイアドレス")
         case .gatewayHelp: value = ("Enter the exact public IP addresses of your VPN gateway, separated by commas. Only these endpoints are allowed outside the tunnel.", "输入 VPN 网关的公网 IP 地址，以逗号分隔。隧道外仅允许访问这些端点。", "VPN ゲートウェイの正確な公開 IP アドレスをカンマで区切って入力してください。トンネル外ではこの接続先のみ許可されます。")
+        case .tunnelHelp: value = ("Use Detect connection to find the active VPN tunnel, or enter its utun interface.", "点击「探测连接」查找当前 VPN 隧道，或填写其 utun 接口。", "「接続を検出」で現在の VPN トンネルを調べるか、utun インターフェイスを入力してください。")
+        case .gatewayRequired: value = ("Use Detect connection, or enter 1–8 VPN gateway IPv4 addresses.", "点击「探测连接」，或填写 1–8 个 VPN 网关 IPv4 地址。", "「接続を検出」を使うか、VPN ゲートウェイの IPv4 アドレスを 1～8 個入力してください。")
+        case .gatewayInvalid: value = ("Enter the VPN gateway's public IPv4 addresses, separated by commas. Hostnames and private addresses are not supported.", "请填写 VPN 网关的公网 IPv4 地址，以逗号分隔。当前不支持域名或私有地址。", "VPN ゲートウェイの公開 IPv4 アドレスをカンマで区切って入力してください。ホスト名とプライベートアドレスには対応していません。")
         case .refresh: value = ("Refresh", "刷新", "更新")
         case .details: value = ("Technical details", "技术信息", "技術情報")
         case .noEvidence: value = ("No connection evidence is available.", "暂无连接信息。", "接続情報を取得できません。")
