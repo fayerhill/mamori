@@ -11,6 +11,27 @@ struct PFRuleSnapshot {
 struct PFRuleInspector {
     let commands: any GuardCommandRunning
 
+    /// Query only existing anchors. A missing anchor can produce DIOCGETRULES
+    /// instead of an empty ruleset, including before activation and after flush.
+    /// Prove absence from successful parent listings; never suppress a read error.
+    func readOwnedRules() throws -> String {
+        var parent = ""
+        var listings: [(path: String, children: [String])] = []
+        var exists = true
+        for component in GuardIdentity.anchor.split(separator: "/") {
+            let children = try childAnchors(of: parent)
+            listings.append((parent, children))
+            let child = parent.isEmpty ? String(component) : parent + "/" + component
+            guard children.contains(child) else { exists = false; break }
+            parent = child
+        }
+        let rules = exists ? try commands.pfRead(["-a", GuardIdentity.anchor, "-s", "rules"]) : ""
+        for listing in listings {
+            guard try childAnchors(of: listing.path) == listing.children else { throw inspectionFailure() }
+        }
+        return rules
+    }
+
     func read() throws -> PFRuleSnapshot {
         let root = try commands.pfRead(["-s", "rules"])
         var pending = [""], index = 0

@@ -2,9 +2,19 @@
 
 [English](../README.md) · [简体中文](../README.zh-CN.md) · [日本語](../README.ja.md)
 
-Updated: 2026-10-12 (Asia/Taipei)
+Updated: 2026-10-14 (Asia/Taipei)
 
-Status: **0.2.0 local development build**. The real guard and complete-uninstall paths are implemented. Build 5 is installed and signature-verified; the latest app-picker alignment was checked in the safe preview. Service registration and the helper's earlier operation have been observed locally. Successful live enforcement and complete-uninstall integration remain unverified. The published `v0.1.0-preview` downloads remain the older, limited ad-hoc builds.
+Status: **0.2.1 local development build, build 6**. The start/quit correction is implemented, tested, and signed. Local installation and live-cycle verification are in progress. The published `v0.1.0-preview` downloads remain older, limited ad-hoc builds.
+
+## Start and quit correction (build 6)
+
+A live administrator read-only check confirmed PF was disabled with zero states, the owned anchor and recovery directory were absent, and querying that missing anchor returned `pfctl: DIOCGETRULES: Invalid argument`. Both fresh activation and no-journal restoration queried the missing anchor directly. The app requires a successful inactive acknowledgment before quitting, so the same defect caused both repeated start failures and the quit loop.
+
+The helper now proves existence or absence through stable parent listings before reading its own anchor. Unknown diagnostics, changing topology, and unjournaled rules remain errors. Inspection failures report the exact command, exit status, and bounded diagnostic. The test fake now reproduces a missing anchor's failure instead of incorrectly returning empty success.
+
+Validation: the two new start/quit regressions fail against unchanged main and pass with the fix. The final sources have 98 passing Swift tests (40 guard tests, 30 policy/session tests, 8 app-model tests, and 20 observation/uninstall tests). Release compilation, Apple Development signing with the installed app's team, and static bundle validation passed. Live-cycle results will be recorded below after installation. Raw host diagnostics, private VPN configuration, signing material, and temporary verifier files are not part of the repository.
+
+The sections below record earlier builds and their validation boundaries.
 
 ## Implemented
 

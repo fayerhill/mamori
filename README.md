@@ -12,11 +12,11 @@
 
 A small, native menu-bar companion for long AI sessions, builds, and research. Choose how long to keep your Mac awake, start a deliberate VPN guard session, and decide which apps should stop if the connection is lost. One compact panel, with a clear way to finish.
 
-**[Get started with 0.2.0](Documentation/Signing.md)** · [Installation & removal](Documentation/Installation.md) · [Progress](Documentation/Progress.md)
+**[Get started with 0.2.1](Documentation/Signing.md)** · [Installation & removal](Documentation/Installation.md) · [Progress](Documentation/Progress.md)
 
 macOS 14+ · Apple silicon local build · English, 简体中文, 日本語
 
-> **0.2.0 is a local development build.** Real helper setup, network guarding, optional app quitting, and complete uninstall are implemented. Service installation and a running helper have been confirmed locally; live network enforcement and complete-uninstall validation remain pending. There is no public notarized 0.2.0 download; the older preview is linked below.
+> **0.2.1 is a local development build.** Real helper setup, network guarding, optional app quitting, and complete uninstall are implemented. Service installation and a running helper have been confirmed locally; live network enforcement and complete-uninstall validation remain pending. There is no public notarized 0.2.1 download; the older preview is linked below.
 
 <p align="center">
   <img src="Artifacts/home-en.png" alt="Mamori's compact native panel in safe preview mode" width="280">
@@ -36,7 +36,7 @@ Keep-awake and guarding are independent. Mamori does not reconnect the VPN or re
 
 ## Start with the current app
 
-1. **Build and sign 0.2.0** using the [signing guide](Documentation/Signing.md). A local Apple Development identity enables the real helper; an ad-hoc build cannot activate it.
+1. **Build and sign 0.2.1** using the [signing guide](Documentation/Signing.md). A local Apple Development identity enables the real helper; an ad-hoc build cannot activate it.
 2. Extract the clean `build/Mamori.zip` into **Applications**, then open Mamori. Build scripts do not install or start its service.
 3. Connect GlobalProtect. In Mamori, choose **Set up protection**, then approve the background service in macOS when requested.
 4. Choose **Detect VPN connection**, review the discovered tunnel and gateway, then **Start guarding**. Startup validation belongs to the authenticated helper, not the menu-bar observation alone.
@@ -54,13 +54,13 @@ This is a workflow for a controlled local evaluation. A valid signature, detecte
 
 ## What has been verified
 
-**89 Swift tests passed for the guard correction.** Six earlier synthetic bundle checks also passed. Build 5 is installed in Applications and passes strict signature validation. Its app picker was checked in the native safe preview: app names align left, checkboxes center vertically, and both checkbox and label clicks toggle selection. Earlier real home/Settings and three-language preview checks also passed. The corrected PF reader matched the real Mac's rules in a read-only check; separate non-activating syntax checks passed. See the [verification record](Documentation/Progress.md) for the exact scope.
+**98 Swift tests pass, including nine regressions for the start/quit correction.** A live read-only check confirmed that querying Mamori's nonexistent PF anchor returns `DIOCGETRULES: Invalid argument`. Build 6 checks stable parent-anchor listings before reading owned rules, so a verified missing anchor counts as empty. Failed inspections still retain recovery state. The signed app and helper pass bundle validation. See the [verification record](Documentation/Progress.md) for installation and live-cycle results.
 
 Live VPN disconnection, successful PF enforcement, and real complete-uninstall integration have **not** been validated. The user's Restore & Quit cleared the failed pre-enable session before the update; this does not validate restoration after active PF enforcement. The current guard targets a narrow GlobalProtect configuration; split tunnels, proxies, and universal VPN compatibility are outside its scope. Two sampled routes do not prove full-tunnel coverage. Keep-awake does not override lid closure or explicit sleep, or guarantee remote AI uptime. Read the [network boundaries](Documentation/NetworkGuard.md) before evaluation.
 
 ## Older preview download
 
-The published **[v0.1.0-preview](https://github.com/fayerhill/mamori/releases/tag/v0.1.0-preview)** is an older Apple silicon, ad-hoc signed, non-notarized build. Its normal app supports keep-awake and read-only observation; real guarding and automatic app quitting are unavailable. It does not contain the current 0.2.0 functionality.
+The published **[v0.1.0-preview](https://github.com/fayerhill/mamori/releases/tag/v0.1.0-preview)** is an older Apple silicon, ad-hoc signed, non-notarized build. Its normal app supports keep-awake and read-only observation; real guarding and automatic app quitting are unavailable. It does not contain the current 0.2.1 functionality.
 
 See the [download guide](Documentation/Download.md) for that release. To explore the current interface safely, build the separate **Mamori Preview**: it simulates VPN, firewall, power, app-quit, and uninstall effects, reading only the installed-app catalog. For real guard evaluation, use the signed local build above.
 
