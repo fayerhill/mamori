@@ -68,7 +68,13 @@ private final class FakePF: GuardCommandRunning, @unchecked Sendable {
             // Actual host failure: partial recursive output despite a zero exit code.
             return CommandResult(code: 0, output: "scrub-anchor \"com.apple/*\" all fragment reassemble\nanchor \"*\" all {\n}\n", error: "No ALTQ support in kernel\nALTQ related functions disabled\npfctl: DIOCGETRULES: Invalid argument\n")
         }
-        else if arguments == ["-a", GuardIdentity.anchor, "-s", "rules"] { output = rules }
+        else if arguments == ["-a", GuardIdentity.anchor, "-s", "rules"] {
+            // macOS does not represent a nonexistent anchor as a successful empty read.
+            if rules.isEmpty && !(anchorListings["com.apple"] ?? []).contains(GuardIdentity.anchor) {
+                return CommandResult(code: 0, output: "", error: "No ALTQ support in kernel\nALTQ related functions disabled\npfctl: DIOCGETRULES: Invalid argument\n")
+            }
+            output = rules
+        }
         else if arguments.last == "Anchors" {
             let path = arguments.first == "-a" ? arguments[1] : ""
             var children = anchorListings[path] ?? []
@@ -113,6 +119,57 @@ final class GuardEngineTests: XCTestCase, @unchecked Sendable {
                 do { continuation.resume(returning: try JSONDecoder().decode(GuardStatus.self, from: data)) }
                 catch { continuation.resume(throwing: error) }
             }
+        }
+    }
+    func testFreshStartDoesNotReadRulesFromNonexistentOwnedAnchor() async throws {
+        let pf = FakePF(), store = MemoryJournal()
+        let result = try await request(engine(pf, store), "start")
+        XCTAssertEqual(result.phase, .protected, result.message)
+        XCTAssertNotNil(store.value)
+    }
+    func testQuitWithoutJournalOrOwnedAnchorAcknowledgesInactiveWithoutMutation() async throws {
+        for action in ["stop", "uninstall"] {
+            let pf = FakePF(), store = MemoryJournal()
+            let result = try await request(engine(pf, store), action)
+            XCTAssertEqual(result.phase, .inactive, result.message)
+            XCTAssertTrue(store.removed)
+            XCTAssertTrue(pf.mutations.isEmpty)
+            XCTAssertFalse(pf.requests.contains(["-a", GuardIdentity.anchor, "-s", "rules"]))
+        }
+    }
+    func testQuitWithoutAppleParentAnchorAcknowledgesInactive() async throws {
+        let pf = FakePF(), store = MemoryJournal()
+        pf.anchorListings[""] = []
+        let result = try await request(engine(pf, store), "stop")
+        XCTAssertEqual(result.phase, .inactive, result.message)
+        XCTAssertTrue(pf.mutations.isEmpty)
+        XCTAssertFalse(pf.requests.contains(["-a", "com.apple", "-s", "Anchors"]))
+    }
+    func testUnjournaledOwnedRulesRemainUntouched() async throws {
+        let pf = FakePF(), store = MemoryJournal()
+        pf.rules = "block drop quick all\n"
+        let result = try await request(engine(pf, store), "stop")
+        XCTAssertEqual(result.phase, .fault)
+        XCTAssertFalse(store.removed)
+        XCTAssertTrue(pf.mutations.isEmpty)
+    }
+    func testPresentOwnedAnchorReadErrorStillPreventsRestore() async throws {
+        let pf = FakePF(), store = MemoryJournal()
+        pf.anchorListings["com.apple", default: []].append(GuardIdentity.anchor)
+        pf.readDiagnosticArguments = ["-a", GuardIdentity.anchor, "-s", "rules"]
+        let result = try await request(engine(pf, store), "stop")
+        XCTAssertEqual(result.phase, .fault)
+        XCTAssertFalse(store.removed)
+        XCTAssertTrue(pf.mutations.isEmpty)
+    }
+    func testUncertainAnchorAbsenceDoesNotAcknowledgeRestore() async throws {
+        for args in [["-s", "Anchors"], ["-a", "com.apple", "-s", "Anchors"]] {
+            let pf = FakePF(), store = MemoryJournal()
+            pf.readDiagnosticArguments = args
+            let result = try await request(engine(pf, store), "stop")
+            XCTAssertEqual(result.phase, .fault)
+            XCTAssertFalse(store.removed)
+            XCTAssertTrue(pf.mutations.isEmpty)
         }
     }
     func testManualDisconnectRetainsPhysicalDefaultDenyAndNarrowsTunnel() async throws {
@@ -352,6 +409,28 @@ final class GuardEngineTests: XCTestCase, @unchecked Sendable {
 }
 
 final class PFRuleInspectorTests: XCTestCase {
+    func testOwnedAnchorCanBePresentButEmpty() throws {
+        let pf = FakePF()
+        pf.anchorListings["com.apple", default: []].append(GuardIdentity.anchor)
+        XCTAssertEqual(try PFRuleInspector(commands: pf).readOwnedRules(), "")
+        XCTAssertTrue(pf.requests.contains(["-a", GuardIdentity.anchor, "-s", "rules"]))
+        XCTAssertTrue(pf.mutations.isEmpty)
+    }
+    func testOwnedAnchorAbsenceRejectsTopologyChanges() {
+        let pf = FakePF()
+        pf.changeTopologyAfterFirstRead = true
+        XCTAssertThrowsError(try PFRuleInspector(commands: pf).readOwnedRules())
+        XCTAssertTrue(pf.mutations.isEmpty)
+    }
+    func testInspectionFailureReportsCommandExitStatusAndDiagnostic() {
+        let pf = FakePF()
+        let arguments = ["-a", GuardIdentity.anchor, "-s", "rules"]
+        pf.readDiagnosticArguments = arguments
+        XCTAssertThrowsError(try pf.pfRead(arguments)) { error in
+            XCTAssertTrue(error.localizedDescription.contains("pfctl -a com.apple/000.mamori -s rules (exit 0)"))
+            XCTAssertTrue(error.localizedDescription.contains("DIOCGETRULES: Invalid argument"))
+        }
+    }
     func testActualHostHierarchyAvoidsBrokenWildcardPrinter() throws {
         let pf = FakePF()
         pf.root = "scrub-anchor \"com.apple/*\" all fragment reassemble\nanchor \"com.apple/*\" all\n"

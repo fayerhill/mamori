@@ -108,7 +108,7 @@ final class GuardEngine: @unchecked Sendable {
         let interfaces = try commands.pfRead(["-v", "-s", "Interfaces"])
         guard !interfaces.lowercased().contains("skip") else { throw GuardFailure.message("PF has interface skip settings. Mamori cannot establish complete packet filtering.") }
     }
-    private func ownRules() throws -> String { try commands.pfRead(["-a", GuardIdentity.anchor, "-s", "rules"]) }
+    private func ownRules() throws -> String { try PFRuleInspector(commands: commands).readOwnedRules() }
     private func enableReferences() throws -> Set<String> {
         let result = try commands.run("/sbin/pfctl", ["-s", "References"])
         guard result.code == 0 else { throw GuardFailure.message("PF enable references could not be read. The saved reference is retained for retry.") }

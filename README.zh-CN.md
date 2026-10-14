@@ -12,11 +12,11 @@
 
 Mamori 是一个轻巧的原生菜单栏工具，陪你完成较长的 AI 任务、构建和研究。选好保醒时长，主动开启 VPN 守护，再决定断线后哪些应用需要退出。操作集中在一个小面板里，结束时也有明确的退出路径。
 
-**[开始使用 0.2.0](Documentation/Signing.md)** · [安装与移除](Documentation/Installation.md) · [开发进度](Documentation/Progress.md)
+**[开始使用 0.2.1](Documentation/Signing.md)** · [安装与移除](Documentation/Installation.md) · [开发进度](Documentation/Progress.md)
 
 macOS 14+ · Apple Silicon 本地构建 · 英语、简体中文、日语
 
-> **0.2.0 是本地开发版本。** 已实现真实后台服务设置、网络守护、可选应用退出和完整卸载；本机已确认服务安装及后台进程运行；真实网络阻断和完整卸载仍待验证。目前没有公开且已公证的 0.2.0 安装包，下方另附旧版预览下载。
+> **0.2.1 是本地开发版本。** 已实现真实后台服务设置、网络守护、可选应用退出和完整卸载；build 6 已安装；真实守护启动、周期校验、还原和正常退出均已通过。更广泛的数据包泄漏测试及完整卸载仍待验证。目前没有公开且已公证的 0.2.1 安装包，下方另附旧版预览下载。
 
 <p align="center">
   <img src="Artifacts/home-zh-Hans.png" alt="Mamori 简体中文安全预览界面" width="280">
@@ -36,7 +36,7 @@ macOS 14+ · Apple Silicon 本地构建 · 英语、简体中文、日语
 
 ## 从当前版本开始
 
-1. 按[签名指南](Documentation/Signing.md)**构建并签名 0.2.0**。本地 Apple Development 身份可启用真实服务；ad-hoc 构建无法启用。
+1. 按[签名指南](Documentation/Signing.md)**构建并签名 0.2.1**。本地 Apple Development 身份可启用真实服务；ad-hoc 构建无法启用。
 2. 将干净的 `build/Mamori.zip` 解压到 **Applications**，再打开 Mamori。构建脚本不会安装或启动后台服务。
 3. 连接 GlobalProtect，在 Mamori 中选择**设置保护服务**，按提示在 macOS 中批准后台服务。
 4. 选择**检测 VPN 连接**，检查识别出的隧道和网关，再点击**开始守护**。启动校验由经过身份认证的后台服务负责，不能仅凭菜单栏的观察结果放行。
@@ -54,13 +54,13 @@ macOS 14+ · Apple Silicon 本地构建 · 英语、简体中文、日语
 
 ## 已经验证了什么
 
-**守护修复的 89 项 Swift 测试通过。** 此前的 6 项合成应用包检查也已通过。build 5 已安装到 Applications 并通过严格签名校验；在原生安全预览中确认应用名称统一左对齐、复选框垂直居中，点击复选框或名称均可切换选择。此前也检查了真实主页、设置页及三种语言的安全预览。PF 读取器已通过本机只读核对，另行执行的非启用式语法检查也已通过。具体范围见[验证记录](Documentation/Progress.md)。
+**98 项 Swift 测试通过，其中 9 项覆盖启动／退出修复。** 本机只读检查确认：查询不存在的 Mamori PF anchor 会返回 `DIOCGETRULES: Invalid argument`。build 6 先通过稳定的父级列表确认 anchor 是否存在，再读取自有规则；只有确认不存在时才视为空规则，检查失败仍保留恢复状态。签名应用和后台服务均通过应用包校验。安装及真实启动／还原结果见[验证记录](Documentation/Progress.md)。
 
-真实 VPN 断线、PF 有效阻断及真实完整卸载集成仍**未经验证**。更新前，用户通过「还原并退出」清理了启用 PF 前失败的会话；这不代表已验证启用 PF 后的还原流程。当前守护针对有限的 GlobalProtect 配置，不涵盖分流、纯代理或所有 VPN。两条抽样路由不能证明全隧道覆盖。保醒也不会阻止合盖或主动睡眠，更不能保证远端 AI 任务持续运行。评估前请阅读[网络边界](Documentation/NetworkGuard.md)。
+真实会话已进入 **Protected**、保持校验通过，并还原为 **Inactive**。正常 macOS 退出请求成功，应用及后台进程退出，PF 恢复关闭且没有启用引用，恢复目录也已移除。这验证了本机的启动和清理流程，不代表普遍的防泄漏保证；主动 VPN 断线、更多数据包场景及完整卸载集成仍待验证。当前守护针对有限的 GlobalProtect 配置，不涵盖分流、纯代理或所有 VPN。两条抽样路由不能证明全隧道覆盖。保醒也不会阻止合盖或主动睡眠，更不能保证远端 AI 任务持续运行。评估前请阅读[网络边界](Documentation/NetworkGuard.md)。
 
 ## 旧版预览下载
 
-公开的 **[v0.1.0-preview](https://github.com/fayerhill/mamori/releases/tag/v0.1.0-preview)** 是面向 Apple Silicon 的旧版 ad-hoc 签名、未公证构建。普通版提供实际保醒和只读观察，不能启用真实守护或自动退出，也不包含当前 0.2.0 的完整功能。
+公开的 **[v0.1.0-preview](https://github.com/fayerhill/mamori/releases/tag/v0.1.0-preview)** 是面向 Apple Silicon 的旧版 ad-hoc 签名、未公证构建。普通版提供实际保醒和只读观察，不能启用真实守护或自动退出，也不包含当前 0.2.1 的完整功能。
 
 旧版安装方式见[下载说明](Documentation/Download.md)。想安全体验当前界面，可构建独立的 **Mamori Preview**：它模拟 VPN、防火墙、保醒、应用退出和卸载，只读取已安装应用目录。评估真实守护时，请使用上方的签名本地构建。
 

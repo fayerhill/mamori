@@ -30,7 +30,8 @@ extension GuardCommandRunning {
         let diagnostics = result.error.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         guard result.code == 0,
               diagnostics.isEmpty || diagnostics == ["No ALTQ support in kernel", "ALTQ related functions disabled"] else {
-            throw GuardFailure.message("PF inspection returned an error. Protection or restoration could not be confirmed.")
+            let detail = diagnostics.joined(separator: " ").prefix(512)
+            throw GuardFailure.message("PF inspection returned an error. Protection or restoration could not be confirmed. pfctl \(arguments.joined(separator: " ")) (exit \(result.code))\(detail.isEmpty ? "" : ": \(detail)")")
         }
         return result.output
     }

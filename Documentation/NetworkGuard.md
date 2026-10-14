@@ -1,6 +1,6 @@
 # Network guard
 
-Mamori is a self-use native macOS application, not a replacement VPN. This release supports a deliberately narrow GlobalProtect configuration. It contains a real PF helper implementation, but the development validation does not install the helper, change firewall rules, disconnect a VPN, or terminate applications. Compilation and pure tests are not an end-to-end enforcement test.
+Mamori is a self-use native macOS application, not a replacement VPN. This release supports a deliberately narrow GlobalProtect configuration. It contains a real PF helper implementation. Build 6 passed a local live start/status/restore cycle and normal Quit on 2026-10-14; see [Progress.md](Progress.md) for the precise scope. Automated tests and preview runs do not install the helper, change firewall rules, disconnect a VPN, or terminate work applications. Compilation and pure tests alone are not an end-to-end enforcement test.
 
 ## Activation prerequisites
 
@@ -40,6 +40,8 @@ A private journal records desired state, owner UID, complete canonical owned rul
 
 ## Quit and uninstall
 
+The owned anchor may not exist before the first activation or after its rules are flushed. Mamori verifies its existence through stable parent-anchor listings before reading its rules. Confirmed absence counts as an empty ruleset; a failed listing, changing hierarchy, or error reading an existing anchor remains a fault. Inspection errors include the PF command, exit status, and bounded diagnostics to make further failures actionable.
+
 Normal Quit must wait for an `inactive` helper acknowledgment. The service records stop intent, removes only its anchor rules, verifies their absence, releases only its own enable token, and removes its recovery journal. A same-boot retry verifies whether that exact reference is already absent before completing interrupted cleanup; unreadable reference state preserves the journal. It never runs a global `pfctl -d`, global rules/state flush, or old-file overwrite. A failure returns `fault` and preserves recovery information.
 
 The private service footprint is `/Library/Application Support/Mamori/guard-session.json` and its root-owned directory. Removal uses fixed paths, removes the directory only when empty, and verifies removal even when an interrupted cleanup has already deleted the journal. The client requests restoration before unregistering its own `SMAppService` daemon and login item. Settings → Complete Uninstall then permanently removes the validated running production app and the current user's exact Mamori data paths; it does not use Trash, remove other copies, or expose arbitrary root deletion. Preview simulates uninstall. Failures retain a visible recovery path; see [Installation.md](Installation.md). No attempt is made to erase system authorization history, unified logs, unrelated shell history, or backups. API calls and direct process arguments do not create interactive shell history.
@@ -50,7 +52,7 @@ Stopping protection does not restore terminated application data or reconnect ol
 
 Automated tests render and inspect policies and exercise state/journal decisions using fixtures. They never invoke the helper, PF, service registration, VPN control, or real application termination. The helper and client can be compiled without activation.
 
-Before treating a signed installation as verified, a separately authorized test must cover existing connections, IPv4/IPv6, UDP/QUIC, DNS, the real gateway/SSO behavior, tunnel replacement, physical network changes, helper/UI failure, and explicit restore. Such disruptive validation was intentionally not performed for this deliverable. Until then the build is an unvalidated guard implementation, not a demonstrated leak-proof security product.
+Before treating a signed installation as verified, a separately authorized test must cover existing connections, IPv4/IPv6, UDP/QUIC, DNS, the real gateway/SSO behavior, tunnel replacement, physical network changes, helper/UI failure, and explicit restore. The local build 6 cycle validated activation, periodic rule verification, and restoration, without disconnecting the VPN or terminating a work application. The broader disruptive matrix above remains unvalidated; the local cycle is not a demonstrated universal leak-proof guarantee.
 
 ## Primary references
 
