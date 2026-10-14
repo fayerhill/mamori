@@ -12,11 +12,11 @@
 
 A small, native menu-bar companion for long AI sessions, builds, and research. Choose how long to keep your Mac awake, start a deliberate VPN guard session, and decide which apps should stop if the connection is lost. One compact panel, with a clear way to finish.
 
-**[Get started with 0.2.1](Documentation/Signing.md)** · [Installation & removal](Documentation/Installation.md) · [Progress](Documentation/Progress.md)
+**[Get started with 0.2.2](Documentation/Signing.md)** · [Installation & removal](Documentation/Installation.md) · [Progress](Documentation/Progress.md)
 
 macOS 14+ · Apple silicon local build · English, 简体中文, 日本語
 
-> **0.2.1 is a local development build.** Real helper setup, network guarding, optional app quitting, and complete uninstall are implemented. Build 6 is installed locally. Live guard activation, periodic verification, restoration, and normal Quit have passed; broader packet-leak and complete-uninstall validation remain pending. There is no public notarized 0.2.1 download; the older preview is linked below.
+> **0.2.2 is a local development build.** Real helper setup, network guarding, optional app quitting, and complete uninstall are implemented. Build 7 is installed locally; every start automatically detects the current VPN. Two automatic-start cycles, periodic verification, restoration, and normal Quit have passed; broader packet-leak and complete-uninstall validation remain pending. There is no public notarized 0.2.2 download; the older preview is linked below.
 
 <p align="center">
   <img src="Artifacts/home-en.png" alt="Mamori's compact native panel in safe preview mode" width="280">
@@ -36,10 +36,10 @@ Keep-awake and guarding are independent. Mamori does not reconnect the VPN or re
 
 ## Start with the current app
 
-1. **Build and sign 0.2.1** using the [signing guide](Documentation/Signing.md). A local Apple Development identity enables the real helper; an ad-hoc build cannot activate it.
+1. **Build and sign 0.2.2** using the [signing guide](Documentation/Signing.md). A local Apple Development identity enables the real helper; an ad-hoc build cannot activate it.
 2. Extract the clean `build/Mamori.zip` into **Applications**, then open Mamori. Build scripts do not install or start its service.
 3. Connect GlobalProtect. In Mamori, choose **Set up protection**, then approve the background service in macOS when requested.
-4. Choose **Detect VPN connection**, review the discovered tunnel and gateway, then **Start guarding**. Startup validation belongs to the authenticated helper, not the menu-bar observation alone.
+4. Choose **Start guarding**. Each start automatically detects the current GlobalProtect tunnel and gateway through the authenticated helper. **Detect VPN connection** is optional for inspection; manual detection or entry is not required.
 5. Enable keep-awake and optional app quitting as needed. Use **Restore & Quit** when finished, or **Settings → Complete Uninstall** to remove the app.
 
 This is a workflow for a controlled local evaluation. A valid signature, detected tunnel, or passing test suite is not proof of live packet protection.
@@ -54,13 +54,13 @@ This is a workflow for a controlled local evaluation. A valid signature, detecte
 
 ## What has been verified
 
-**98 Swift tests pass, including nine regressions for the start/quit correction.** A live read-only check confirmed that querying Mamori's nonexistent PF anchor returns `DIOCGETRULES: Invalid argument`. Build 6 checks stable parent-anchor listings before reading owned rules, so a verified missing anchor counts as empty. Failed inspections still retain recovery state. The signed app and helper pass bundle validation. See the [verification record](Documentation/Progress.md) for installation and live-cycle results.
+**100 Swift tests pass, including five automatic-start tests and nine regressions for the start/quit correction.** A live read-only check confirmed that querying Mamori's nonexistent PF anchor returns `DIOCGETRULES: Invalid argument`. Build 6 checks stable parent-anchor listings before reading owned rules, so a verified missing anchor counts as empty. Failed inspections still retain recovery state. The signed app and helper pass bundle validation. See the [verification record](Documentation/Progress.md) for installation and live-cycle results.
 
 A live cycle reached **Protected**, remained verified, and restored to **Inactive**. Normal macOS Quit completed, the app and helper exited, PF was disabled with no enable references, and the recovery directory was absent. These checks verify activation and cleanup on this Mac; they do not establish universal leak prevention. Deliberate VPN disconnection, broader packet behavior, and real complete-uninstall integration remain unvalidated. The current guard targets a narrow GlobalProtect configuration; split tunnels, proxies, and universal VPN compatibility are outside its scope. Two sampled routes do not prove full-tunnel coverage. Keep-awake does not override lid closure or explicit sleep, or guarantee remote AI uptime. Read the [network boundaries](Documentation/NetworkGuard.md) before evaluation.
 
 ## Older preview download
 
-The published **[v0.1.0-preview](https://github.com/fayerhill/mamori/releases/tag/v0.1.0-preview)** is an older Apple silicon, ad-hoc signed, non-notarized build. Its normal app supports keep-awake and read-only observation; real guarding and automatic app quitting are unavailable. It does not contain the current 0.2.1 functionality.
+The published **[v0.1.0-preview](https://github.com/fayerhill/mamori/releases/tag/v0.1.0-preview)** is an older Apple silicon, ad-hoc signed, non-notarized build. Its normal app supports keep-awake and read-only observation; real guarding and automatic app quitting are unavailable. It does not contain the current 0.2.2 functionality.
 
 See the [download guide](Documentation/Download.md) for that release. To explore the current interface safely, build the separate **Mamori Preview**: it simulates VPN, firewall, power, app-quit, and uninstall effects, reading only the installed-app catalog. For real guard evaluation, use the signed local build above.
 

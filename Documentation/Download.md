@@ -1,6 +1,6 @@
 # Download and open Mamori
 
-The published `v0.1.0-preview` assets are an older limited build. Current 0.2.1 source adds signed local helper setup and complete uninstall; see [Signing.md](Signing.md) to build that version. Use the app assets attached to a GitHub release. GitHub's **Source code** archives contain the project for developers, not an installed app.
+The published `v0.1.0-preview` assets are an older limited build. Current 0.2.2 source adds signed local helper setup and complete uninstall; see [Signing.md](Signing.md) to build that version. Use the app assets attached to a GitHub release. GitHub's **Source code** archives contain the project for developers, not an installed app.
 
 | Download | Purpose |
 | --- | --- |

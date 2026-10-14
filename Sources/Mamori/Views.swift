@@ -310,10 +310,10 @@ struct MamoriView: View {
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         sectionLabel(.tunnel)
-                        TextField("utun…", text: $model.tunnelInterface).textFieldStyle(.roundedBorder)
+                        Text(model.tunnelInterface.isEmpty ? model.t(.automaticDetection) : model.tunnelInterface).textSelection(.enabled)
                             .accessibilityIdentifier("tunnel-interface")
                         sectionLabel(.gateways)
-                        TextField("203.0.113.10", text: $model.gatewayAddresses).textFieldStyle(.roundedBorder)
+                        Text(model.gatewayAddresses.isEmpty ? model.t(.automaticDetection) : model.gatewayAddresses).textSelection(.enabled)
                             .accessibilityIdentifier("gateway-addresses")
                         Text(model.t(.gatewayHelp)).font(.system(size: 11)).foregroundStyle(Theme.secondary)
                     }.disabled(model.guardIsActive || !model.canConfigure)
