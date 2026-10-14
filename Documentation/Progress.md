@@ -4,7 +4,7 @@
 
 Updated: 2026-10-14 (Asia/Taipei)
 
-Status: **0.2.1 local development build, build 6**. The start/quit correction is implemented, tested, and signed. Local installation and live-cycle verification are in progress. The published `v0.1.0-preview` downloads remain older, limited ad-hoc builds.
+Status: **0.2.1 local development build, build 6**. The start/quit correction is installed at `/Applications/Mamori.app`, signed, and verified through a live guard cycle and normal macOS Quit. The published `v0.1.0-preview` downloads remain older, limited ad-hoc builds.
 
 ## Start and quit correction (build 6)
 
@@ -12,7 +12,18 @@ A live administrator read-only check confirmed PF was disabled with zero states,
 
 The helper now proves existence or absence through stable parent listings before reading its own anchor. Unknown diagnostics, changing topology, and unjournaled rules remain errors. Inspection failures report the exact command, exit status, and bounded diagnostic. The test fake now reproduces a missing anchor's failure instead of incorrectly returning empty success.
 
-Validation: the two new start/quit regressions fail against unchanged main and pass with the fix. The final sources have 98 passing Swift tests (40 guard tests, 30 policy/session tests, 8 app-model tests, and 20 observation/uninstall tests). Release compilation, Apple Development signing with the installed app's team, and static bundle validation passed. Live-cycle results will be recorded below after installation. Raw host diagnostics, private VPN configuration, signing material, and temporary verifier files are not part of the repository.
+Validation: the two new start/quit regressions fail against unchanged main and pass with the fix. The final sources have 98 passing Swift tests (40 guard tests, 30 policy/session tests, 8 app-model tests, and 20 observation/uninstall tests). Release compilation, Apple Development signing with the installed app's team, and static bundle validation passed. The installed app matches the repaired signed build and passes deep, strict signature verification. Raw host diagnostics, private VPN configuration, signing material, and temporary verifier files are not part of the repository.
+
+### Live verification on 2026-10-14
+
+- Installed 0.2.1 (build 6) at `/Applications/Mamori.app` with the existing signing team and restarted its helper. The installed helper hash matches the verified build.
+- A temporary same-team signed client exercised the existing authenticated XPC contract: inactive status, successful GlobalProtect discovery, `start → protected`, periodic `status → protected`, and `stop → inactive`. It automatically requested restoration on failure and did not control or disconnect the VPN.
+- A subsequent administrator read-only inspection confirmed PF disabled, zero states, no PF starter references, and no recovery directory. PF retained the allocated owned anchor name after flushing; this is distinct from active rules or a retained enable reference.
+- Launched the installed application. Its pending-restoration preference cleared after the helper's inactive acknowledgment. A main-thread sample showed the normal event loop rather than a hang.
+- Sent a normal macOS application-termination request (not a signal or force quit). The installed app acknowledged restoration and exited; the helper then exited. The pending-restoration flag remained false.
+- Native UI automation could launch the accessory app but timed out while obtaining its accessibility state. No new visual UI verification is claimed; normal termination was checked through the macOS application lifecycle API.
+
+This verifies the reported start/quit failures and active-session cleanup on the local Mac. It does not claim exhaustive packet-leak protection, a tested deliberate VPN disconnection, full-tunnel proof, or real complete-uninstall integration. No work application was terminated and the connected VPN was left unchanged. The local development-signed binary is not published as a notarized download.
 
 The sections below record earlier builds and their validation boundaries.
 
@@ -65,7 +76,7 @@ The signed release build and static bundle validation passed. Native safe-previe
 
 ## Remaining before a validated network-protection release
 
-1. Finish validating the installed helper: successful guard activation, recovery and normal Quit after active enforcement, and complete uninstall on a controlled test Mac.
+1. Extend the verified local start/restore/quit cycle to interrupted-session recovery and complete uninstall on a controlled test Mac.
 2. Validate packet behavior in a separately authorized environment: existing connections, IPv4/IPv6, DNS, UDP/QUIC, narrow gateway and authentication exceptions, tunnel replacement, network transitions, and process failures.
 3. Confirm compatibility with specific GlobalProtect versions and strengthen VPN evidence where needed. Do not infer universal VPN support from the generic tunnel interface.
 4. Obtain Developer ID signing and validate the notarization and public distribution workflow.

@@ -16,7 +16,7 @@ A small, native menu-bar companion for long AI sessions, builds, and research. C
 
 macOS 14+ · Apple silicon local build · English, 简体中文, 日本語
 
-> **0.2.1 is a local development build.** Real helper setup, network guarding, optional app quitting, and complete uninstall are implemented. Service installation and a running helper have been confirmed locally; live network enforcement and complete-uninstall validation remain pending. There is no public notarized 0.2.1 download; the older preview is linked below.
+> **0.2.1 is a local development build.** Real helper setup, network guarding, optional app quitting, and complete uninstall are implemented. Build 6 is installed locally. Live guard activation, periodic verification, restoration, and normal Quit have passed; broader packet-leak and complete-uninstall validation remain pending. There is no public notarized 0.2.1 download; the older preview is linked below.
 
 <p align="center">
   <img src="Artifacts/home-en.png" alt="Mamori's compact native panel in safe preview mode" width="280">
@@ -56,7 +56,7 @@ This is a workflow for a controlled local evaluation. A valid signature, detecte
 
 **98 Swift tests pass, including nine regressions for the start/quit correction.** A live read-only check confirmed that querying Mamori's nonexistent PF anchor returns `DIOCGETRULES: Invalid argument`. Build 6 checks stable parent-anchor listings before reading owned rules, so a verified missing anchor counts as empty. Failed inspections still retain recovery state. The signed app and helper pass bundle validation. See the [verification record](Documentation/Progress.md) for installation and live-cycle results.
 
-Live VPN disconnection, successful PF enforcement, and real complete-uninstall integration have **not** been validated. The user's Restore & Quit cleared the failed pre-enable session before the update; this does not validate restoration after active PF enforcement. The current guard targets a narrow GlobalProtect configuration; split tunnels, proxies, and universal VPN compatibility are outside its scope. Two sampled routes do not prove full-tunnel coverage. Keep-awake does not override lid closure or explicit sleep, or guarantee remote AI uptime. Read the [network boundaries](Documentation/NetworkGuard.md) before evaluation.
+A live cycle reached **Protected**, remained verified, and restored to **Inactive**. Normal macOS Quit completed, the app and helper exited, PF was disabled with no enable references, and the recovery directory was absent. These checks verify activation and cleanup on this Mac; they do not establish universal leak prevention. Deliberate VPN disconnection, broader packet behavior, and real complete-uninstall integration remain unvalidated. The current guard targets a narrow GlobalProtect configuration; split tunnels, proxies, and universal VPN compatibility are outside its scope. Two sampled routes do not prove full-tunnel coverage. Keep-awake does not override lid closure or explicit sleep, or guarantee remote AI uptime. Read the [network boundaries](Documentation/NetworkGuard.md) before evaluation.
 
 ## Older preview download
 
