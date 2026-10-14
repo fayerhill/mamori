@@ -28,8 +28,8 @@ final class AppModel: ObservableObject {
     @Published var showUninstallConfirmation = false
     @Published var showError = false
     @Published var errorMessage = ""
-    @Published var tunnelInterface = ""
-    @Published var gatewayAddresses = ""
+    @Published private(set) var tunnelInterface = ""
+    @Published private(set) var gatewayAddresses = ""
     @Published var forceQuitEnabled = false {
         didSet { if !forceQuitEnabled { cancelPendingQuits() } }
     }
@@ -230,37 +230,7 @@ final class AppModel: ObservableObject {
         if session.phase == .fault { send(.retryRestoration); return }
         if guardIsActive { send(.stopGuard); return }
         guard isDemo || helperAvailable else { screen = .connection; return }
-        if !isDemo, !validateGuardInput() { return }
         send(.startGuard)
-    }
-
-    /// The observer is advisory. The authenticated helper verifies the actual
-    /// GlobalProtect connection before making any firewall changes.
-    func validateGuardInput() -> Bool {
-        do {
-            try GuardPolicy.validate(guardConfiguration)
-            return true
-        } catch {
-            screen = .connection
-            switch error as? GuardPolicyError {
-            case .invalidTunnel: report(t(.tunnelHelp))
-            case .noGateway: report(t(.gatewayRequired))
-            case .invalidGateway: report(t(.gatewayInvalid))
-            default: report(error.localizedDescription)
-            }
-            return false
-        }
-    }
-
-    private var guardConfiguration: GuardConfiguration {
-        GuardConfiguration(
-            tunnelInterface: tunnelInterface.trimmingCharacters(in: .whitespacesAndNewlines),
-            gatewayAddresses: parsedGateways
-        )
-    }
-
-    private var parsedGateways: [String] {
-        gatewayAddresses.split(whereSeparator: { $0 == "," || $0.isWhitespace }).map(String.init)
     }
 
     func installHelper() {
@@ -458,7 +428,6 @@ final class AppModel: ObservableObject {
         switch effect {
         case .activateGuard(let operation):
             backendRequest &+= 1
-            let configuration = guardConfiguration
             Task { [weak self] in
                 guard let self else { return }
                 if isDemo {
@@ -466,10 +435,28 @@ final class AppModel: ObservableObject {
                     send(.guardActivationCompleted(operation: operation, result: .verified(vpnConnected ? .connected : .disconnected)))
                 } else if let guardClient {
                     _ = await backendCheckTask?.value
-                    backend = await guardClient.start(configuration: configuration)
-                    let result: GuardActivationResult = backend.isEnforcing ? .verified(backendSignal) : .failed(backend.message)
-                    send(.guardActivationCompleted(operation: operation, result: result))
-                    if !backend.isEnforcing { report(backend.message) }
+                    let outcome = await GuardStartFlow.run(discover: {
+                        await guardClient.discoverConfiguration()
+                    }, activate: { configuration in
+                        tunnelInterface = configuration.tunnelInterface
+                        gatewayAddresses = configuration.gatewayAddresses.joined(separator: ", ")
+                        return await guardClient.start(configuration: configuration)
+                    }, isCurrent: {
+                        !session.wantsToQuit && session.phase == .arming && session.guardOperation == operation
+                    })
+                    switch outcome {
+                    case .cancelled:
+                        send(.guardActivationCompleted(operation: operation, result: .failed("Guard activation was cancelled.")))
+                    case .discoveryFailed(let message):
+                        connectionEvidence.append(message)
+                        send(.guardActivationCompleted(operation: operation, result: .failed(message)))
+                        report(message)
+                    case .activated(let status):
+                        backend = status
+                        let result: GuardActivationResult = backend.isEnforcing ? .verified(backendSignal) : .failed(backend.message)
+                        send(.guardActivationCompleted(operation: operation, result: result))
+                        if !backend.isEnforcing { report(backend.message) }
+                    }
                 }
             }
         case .restoreGuard(let operation):

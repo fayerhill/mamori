@@ -4,7 +4,15 @@
 
 Updated: 2026-10-14 (Asia/Taipei)
 
-Status: **0.2.1 local development build, build 6**. The start/quit correction is installed at `/Applications/Mamori.app`, signed, and verified through a live guard cycle and normal macOS Quit. The published `v0.1.0-preview` downloads remain older, limited ad-hoc builds.
+Status: **0.2.2 local development build, build 7**. Automatic VPN detection on every start is installed at `/Applications/Mamori.app`, signed, and verified through two live guard cycles and normal macOS Quit. The published `v0.1.0-preview` downloads remain older, limited ad-hoc builds.
+
+## Automatic detection on every start (build 7)
+
+Start guarding now performs fresh discovery through the authenticated helper before each activation. It uses the current tunnel and gateways rather than requiring a prior manual detection or reusing displayed values. Connection details are read-only; the manual Detect control remains optional for inspection. A discovery failure reports the helper message without activating protection. Quitting or cancelling while discovery is pending prevents a late activation and completes the existing restoration flow.
+
+Validation: all 100 Swift tests pass (40 guard, 30 policy/session, 10 app, and 20 observation/uninstall tests). Five startup-flow regressions cover fresh configurations on repeated starts, discovery failure, cancellation before and during discovery, and helper activation failure. They replace three obsolete manual-input tests. Release compilation, Apple Development signing with the existing team, and static bundle validation passed.
+
+A temporary same-team signed verifier used the production startup-flow source and the installed helper's authenticated XPC API for two consecutive automatic discovery → protected → periodic protected status → inactive restoration cycles. Both passed. The installed app also exited after a normal macOS termination request, with its pending-restoration flag cleared. Installed executable hashes matched the verified build. Native accessibility inspection still timed out; this is startup-flow and lifecycle verification, not a new visual UI inspection. No VPN disconnection or work-app termination was tested.
 
 ## Start and quit correction (build 6)
 
