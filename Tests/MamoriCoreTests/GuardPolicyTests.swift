@@ -14,9 +14,32 @@ final class GuardPolicyTests: XCTestCase {
     func testDisconnectedPolicyDoesNotAllowAnyTunnelOrGeneralDNS() throws {
         let policy = try GuardPolicy.render(configuration, tunnelAllowed: false)
         XCTAssertFalse(policy.contains("utun"))
-        XCTAssertFalse(policy.contains("port 53"))
+        XCTAssertNil(policy.range(of: #"port 53\b"#, options: .regularExpression))
         XCTAssertTrue(policy.contains("to { 203.0.113.4 } port 443"))
         XCTAssertTrue(policy.contains("to { 203.0.113.4 } port 4501"))
+    }
+    func testLocalDeviceRulesRequireLocalAddressesAtBothEndsInEveryVPNState() throws {
+        for tunnelAllowed in [true, false] {
+            let lines = GuardPolicy.meaningfulLines(try GuardPolicy.render(configuration, tunnelAllowed: tunnelAllowed))
+            let local = lines.filter { $0.contains("label \"mamori-local-") }
+            XCTAssertEqual(local, [
+                "pass quick inet from { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 } to { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 } flags any no state label \"mamori-local-ipv4\"",
+                "pass quick inet6 from { fe80::/10, fc00::/7 } to { fe80::/10, fc00::/7 } flags any no state label \"mamori-local-ipv6\""
+            ])
+            // No interface snapshot: AirDrop/USB links may appear after activation.
+            XCTAssertFalse(local.contains { $0.contains(" on ") })
+            XCTAssertTrue(local.allSatisfy { lines.firstIndex(of: $0)! < lines.count - 1 })
+        }
+    }
+    func testBonjourAndIPv6DiscoveryExceptionsAreLimitedToLinkLocalMulticast() throws {
+        let lines = GuardPolicy.meaningfulLines(try GuardPolicy.render(configuration, tunnelAllowed: false))
+        let mdns = lines.filter { $0.contains("label \"mamori-mdns-") }
+        XCTAssertEqual(mdns.count, 2)
+        XCTAssertTrue(mdns[0].contains("inet proto udp from { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 } to 224.0.0.251 port 5353 no state"))
+        XCTAssertTrue(mdns[1].contains("inet6 proto udp from { fe80::/10, fc00::/7 } to ff02::fb port 5353 no state"))
+        let discovery = lines.filter { $0.contains("label \"mamori-ipv6-discovery\"") }
+        XCTAssertEqual(discovery, ["pass quick inet6 proto icmp6 from { ::/128, fe80::/10 } to ff02::/16 icmp6-type { 130, 131, 132, 133, 134, 135, 136, 143 } no state label \"mamori-ipv6-discovery\""])
+        XCTAssertFalse(lines.contains { $0.contains("224.0.0.0/4") || $0.contains("ff00::/8") })
     }
     func testConfigurationCannotInjectPFRules() {
         for tunnel in ["en0", "utun9\n", "utun9\npass all", "utun*", "utun", "utun00000"] {

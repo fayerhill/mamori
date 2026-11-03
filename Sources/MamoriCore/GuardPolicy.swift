@@ -38,8 +38,20 @@ public enum GuardPolicy {
     public static func render(_ configuration: GuardConfiguration, tunnelAllowed: Bool) throws -> String {
         try validate(configuration)
         let gateways = Array(Set(configuration.gatewayAddresses)).sorted().joined(separator: ", ")
+        // Both endpoints must be local: never turn a private source address into
+        // permission to reach arbitrary internet destinations. Literal ranges
+        // also cover peer interfaces (AWDL/USB) created after the guard starts.
+        let localIPv4 = "{ 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 }"
+        let localIPv6 = "{ fe80::/10, fc00::/7 }"
         var rules = [
             "pass quick on lo0 all flags any no state label \"mamori-loopback\"",
+            "pass quick inet from \(localIPv4) to \(localIPv4) flags any no state label \"mamori-local-ipv4\"",
+            "pass quick inet6 from \(localIPv6) to \(localIPv6) flags any no state label \"mamori-local-ipv6\"",
+            "pass quick inet proto udp from \(localIPv4) to 224.0.0.251 port 5353 no state label \"mamori-mdns-ipv4\"",
+            "pass quick inet6 proto udp from \(localIPv6) to ff02::fb port 5353 no state label \"mamori-mdns-ipv6\"",
+            // IPv6 needs multicast neighbor discovery, including DAD from ::,
+            // and listener discovery before AirDrop can use its link-local path.
+            "pass quick inet6 proto icmp6 from { ::/128, fe80::/10 } to ff02::/16 icmp6-type { 130, 131, 132, 133, 134, 135, 136, 143 } no state label \"mamori-ipv6-discovery\"",
             "pass out quick inet proto udp from any port 68 to 255.255.255.255 port 67 no state label \"mamori-dhcp-out\"",
             "pass in quick inet proto udp from any port 67 to any port 68 no state label \"mamori-dhcp-in\"",
             "pass out quick inet proto tcp to { \(gateways) } port 443 flags any no state label \"mamori-vpn-tcp-out\"",

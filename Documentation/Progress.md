@@ -2,9 +2,17 @@
 
 [English](../README.md) · [简体中文](../README.zh-CN.md) · [日本語](../README.ja.md)
 
-Updated: 2026-10-14 (Asia/Taipei)
+Updated: 2026-11-03 (Asia/Taipei)
 
-Status: **0.2.2 local development build, build 7**. Automatic VPN detection on every start is installed at `/Applications/Mamori.app`, signed, and verified through two live guard cycles and normal macOS Quit. The published `v0.1.0-preview` downloads remain older, limited ad-hoc builds.
+Status: **0.2.2 local development build, build 8**. Local-device firewall exceptions are implemented and a signed build is prepared, but not installed or verified with a real iPhone. Build 7's earlier live-cycle results are recorded below. The published `v0.1.0-preview` downloads remain older, limited ad-hoc builds.
+
+## Local networking and AirDrop (build 8)
+
+The blanket non-tunnel block also blocked iPhone development connections and AirDrop. The policy now permits traffic between private/link-local IPv4 or IPv6 addresses, local Bonjour discovery, and link-local ICMPv6 neighbor/router and multicast-listener discovery. Both endpoints of local unicast traffic must be in the approved local ranges. These stateless exceptions remain present when the VPN disconnects, while public destinations still require the verified tunnel or exact VPN transport exceptions. No unrestricted physical-interface pass is added. Local peers (including DNS servers, proxies, and relays) are trusted; see [NetworkGuard.md](NetworkGuard.md) for boundaries.
+
+Validation: all 102 Swift tests pass. Two new policy regressions cover local endpoints and bounded discovery, and the existing disconnect regression now checks that local exceptions survive policy narrowing. The public-DNS assertion distinguishes port 53 from Bonjour port 5353. The installed macOS `pfctl -n -v` parser accepts both rendered policies, and both canonical outputs pass the helper's compiled-policy validation. A separate packet-matching model checked 50 local-allow/public-deny cases against those canonical outputs; this is simulation, not packet capture or live enforcement. Release compilation, Apple Development signing, and static bundle validation passed.
+
+The prepared build uses an available development signing team different from the installed app's team. Installation/service replacement and any new macOS approval remain separate steps. No app was replaced, helper registered, live PF policy changed, VPN disconnected, or work app terminated. Stop the existing guard cleanly before replacing the app, then start a fresh session to load the updated policy. AirDrop transfer, iPhone development traffic, and live leak testing remain pending; GlobalProtect's own LAN routing/restrictions can still prevent access.
 
 ## Automatic detection on every start (build 7)
 

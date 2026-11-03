@@ -16,7 +16,7 @@ A small, native menu-bar companion for long AI sessions, builds, and research. C
 
 macOS 14+ · Apple silicon local build · English, 简体中文, 日本語
 
-> **0.2.2 is a local development build.** Real helper setup, network guarding, optional app quitting, and complete uninstall are implemented. Build 7 is installed locally; every start automatically detects the current VPN. Two automatic-start cycles, periodic verification, restoration, and normal Quit have passed; broader packet-leak and complete-uninstall validation remain pending. There is no public notarized 0.2.2 download; the older preview is linked below.
+> **0.2.2 is a local development build.** Real helper setup, network guarding, optional app quitting, and complete uninstall are implemented. Build 8 adds local-network and AirDrop firewall exceptions; its signed build is prepared but real-device verification is pending. Build 7 passed two automatic-start cycles, periodic verification, restoration, and normal Quit; broader packet-leak and complete-uninstall validation remain pending. There is no public notarized 0.2.2 download; the older preview is linked below.
 
 <p align="center">
   <img src="Artifacts/home-en.png" alt="Mamori's compact native panel in safe preview mode" width="280">
@@ -54,7 +54,7 @@ This is a workflow for a controlled local evaluation. A valid signature, detecte
 
 ## What has been verified
 
-**100 Swift tests pass, including five automatic-start tests and nine regressions for the start/quit correction.** A live read-only check confirmed that querying Mamori's nonexistent PF anchor returns `DIOCGETRULES: Invalid argument`. Build 6 checks stable parent-anchor listings before reading owned rules, so a verified missing anchor counts as empty. Failed inspections still retain recovery state. The signed app and helper pass bundle validation. See the [verification record](Documentation/Progress.md) for installation and live-cycle results.
+**102 Swift tests pass, including two local-network policy regressions, five automatic-start tests, and nine regressions for the start/quit correction.** A live read-only check confirmed that querying Mamori's nonexistent PF anchor returns `DIOCGETRULES: Invalid argument`. Build 6 checks stable parent-anchor listings before reading owned rules, so a verified missing anchor counts as empty. Failed inspections still retain recovery state. The signed app and helper pass bundle validation. See the [verification record](Documentation/Progress.md) for installation and live-cycle results.
 
 A live cycle reached **Protected**, remained verified, and restored to **Inactive**. Normal macOS Quit completed, the app and helper exited, PF was disabled with no enable references, and the recovery directory was absent. These checks verify activation and cleanup on this Mac; they do not establish universal leak prevention. Deliberate VPN disconnection, broader packet behavior, and real complete-uninstall integration remain unvalidated. The current guard targets a narrow GlobalProtect configuration; split tunnels, proxies, and universal VPN compatibility are outside its scope. Two sampled routes do not prove full-tunnel coverage. Keep-awake does not override lid closure or explicit sleep, or guarantee remote AI uptime. Read the [network boundaries](Documentation/NetworkGuard.md) before evaluation.
 
