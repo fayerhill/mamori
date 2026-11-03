@@ -187,6 +187,9 @@ final class GuardEngineTests: XCTestCase, @unchecked Sendable {
         XCTAssertFalse(pf.rules.contains("mamori-tunnel"))
         XCTAssertFalse(pf.rules.contains("on en0"))
         XCTAssertTrue(pf.loadedPolicies.allSatisfy { $0.contains("block drop quick all") })
+        for label in ["mamori-local-ipv4", "mamori-local-ipv6", "mamori-mdns-ipv4", "mamori-mdns-ipv6", "mamori-ipv6-discovery"] {
+            XCTAssertTrue(pf.loadedPolicies.allSatisfy { $0.contains("label \"\(label)\"") }, label)
+        }
         XCTAssertFalse(pf.mutations.contains { $0.contains("-F") || $0.contains("-X") })
     }
     func testUnreadableVPNEvidenceBlocksWithoutConfirmingLoss() async throws {
